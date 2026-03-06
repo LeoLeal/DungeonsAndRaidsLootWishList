@@ -28,9 +28,15 @@ function LootEvents.HandleStartLootRoll(namespace, rollID)
     return
   end
 
-  frame.LootWishListTag = frame.LootWishListTag or frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  frame.LootWishListTag:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -108, -12)
-  frame.LootWishListTag:SetText(namespace.GetText("WISHLIST"))
+  if not frame.LootWishListTag then
+    frame.LootWishListTag = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local font, size, flags = frame.LootWishListTag:GetFont()
+    if font and size then
+      frame.LootWishListTag:SetFont(font, size - 1, flags)
+    end
+  end
+  frame.LootWishListTag:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -84, -12)
+  frame.LootWishListTag:SetText(string.upper(namespace.GetText("WISHLIST")))
   frame.LootWishListTag:Show()
 end
 
