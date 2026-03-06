@@ -1,0 +1,20 @@
+# WoW Addon specific
+*.toc.backup
+*.lua.backup
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# OpenCode (local agent config - optional to ignore)
+.opencode/node_modules/
+.opencode/bun.lock
+
+# Agent config
+.agent/
