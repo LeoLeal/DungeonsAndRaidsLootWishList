@@ -215,6 +215,7 @@ function TrackerUI.Refresh(namespace, groups)
     headerRow:SetPoint("TOPRIGHT", 0, yOffset)
     headerRow.tick:Hide()
     headerRow.text:SetFontObject(GameFontNormal)
+    headerRow.text:SetTextColor(GameFontNormal:GetTextColor())
     headerRow.text:SetText(group.label)
     headerRow.itemKey = nil
     headerRow:Show()

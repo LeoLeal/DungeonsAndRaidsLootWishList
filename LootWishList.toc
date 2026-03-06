@@ -1,9 +1,10 @@
 ## Interface: 120000
-## Title: Loot WishList
+## Title: Dungeons and Raids Loot WishList
 ## Notes: Adventure Guide loot wishlist and tracker integration
 ## Author: Leonardo Leal
 ## Version: 0.1.0
 ## SavedVariablesPerCharacter: LootWishListDB
+## IconTexture: Interface\AddOns\DungeonsAndRaidsLootWishList\logo
 
 WishlistStore.lua
 ItemResolver.lua
