@@ -9,6 +9,15 @@ namespace.state = namespace.state or {
 local eventFrame = CreateFrame("Frame")
 namespace.eventFrame = eventFrame
 
+StaticPopupDialogs["LOOT_WISHLIST_ALERT"] = {
+  text = "%s",
+  button1 = OKAY or "OK",
+  hasItemFrame = 1,
+  timeout = 0,
+  whileDead = 1,
+  hideOnEscape = 1,
+}
+
 local function getCharacterKey()
   local name = UnitName("player") or "Unknown"
   local realm = GetRealmName() or "Unknown"
@@ -232,11 +241,23 @@ function namespace.BuildTrackerGroups()
   return namespace.TrackerModel.buildGroups(renderItems, namespace.GetText("OTHER"))
 end
 
-function namespace.ShowAlert(message)
-  if RaidWarningFrame and type(RaidNotice_AddMessage) == "function" then
-    RaidNotice_AddMessage(RaidWarningFrame, message, ChatTypeInfo["RAID_WARNING"])
-  elseif UIErrorsFrame and UIErrorsFrame.AddMessage then
-    UIErrorsFrame:AddMessage(message, 1.0, 0.82, 0.0, 1.0)
+function namespace.ShowLootDialog(playerName, itemLink)
+  if type(StaticPopup_Show) == "function" then
+    -- Format message text: white body, orange player name with padding newlines
+    -- \194\160 is the UTF-8 non-breaking space, which prevents WoW from trimming/collapsing the spaces
+    local message = string.format(
+      "|n\194\160\194\160" ..
+      (namespace.GetText("PLAYER_LOOTED_WISHLIST_ITEM") or "|cFFFFFFFF%s|r looted an item on your Loot Wishlist!") ..
+      "\194\160\194\160|n|n",
+      "|cFFFF8000" .. playerName .. "|cFFFFFFFF"
+    )
+
+    local data = {
+      link = itemLink,
+      useLinkForItemInfo = true
+    }
+
+    StaticPopup_Show("LOOT_WISHLIST_ALERT", message, nil, data)
   end
 end
 

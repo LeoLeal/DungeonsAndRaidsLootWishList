@@ -103,9 +103,16 @@ function LootEvents.HandleChatLoot(namespace, message, playerNameEvent)
   end
 
   if player and itemLink then
-    namespace.ShowAlert(namespace.GetText("OTHER_PLAYER_LOOTED", player, itemLink))
+    namespace.ShowLootDialog(player, itemLink)
   else
-    namespace.ShowAlert(message)
+    -- Fallback ideally should not happen if we parsed correctly
+    if type(StaticPopup_Show) == "function" then
+      local data = {
+        link = itemLink,
+        useLinkForItemInfo = true
+      }
+      StaticPopup_Show("LOOT_WISHLIST_ALERT", message, nil, data)
+    end
   end
 end
 
