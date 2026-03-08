@@ -13,14 +13,6 @@ local knownRowKeys = {}
 local ns = nil
 
 ---------------------------------------------------------------------------
--- Private tooltip – avoids tainting the shared GameTooltip whose internal
--- dimensions are later read by Blizzard secure code in
--- EmbeddedItemTooltip_UpdateSize.
----------------------------------------------------------------------------
-local privateTooltip = CreateFrame("GameTooltip", "LootWishListTooltip", UIParent, "GameTooltipTemplate")
-privateTooltip:SetOwner(UIParent, "ANCHOR_NONE")
-
----------------------------------------------------------------------------
 -- LayoutContents – called by the tracker manager during its update cycle.
 -- Reads `currentGroups` and produces blocks (one per loot-source group)
 -- with lines (one per tracked item).
@@ -76,23 +68,26 @@ local function layoutContents(self)
         end
 
 
-        -- Tooltip on hover.  Uses a private tooltip frame to avoid tainting
-        -- the shared GameTooltip (which Blizzard secure code reads later).
+        -- Tooltip on hover. Uses the shared GameTooltip to prevent secure
+        -- environment taint.
         local tooltipRef = item.displayLink or item.tooltipRef
         local itemID = item.itemID
         line:SetScript("OnEnter", function(self)
-          privateTooltip:SetOwner(self, "ANCHOR_CURSOR")
+          -- Set the owner to UIParent (safe/secure) instead of self (insecure)
+          -- using ANCHOR_CURSOR natively handles the mouse tracking position
+          GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR")
+
           if type(tooltipRef) == "string" and tooltipRef:find("item:") then
-            privateTooltip:SetHyperlink(tooltipRef)
+            GameTooltip:SetHyperlink(tooltipRef)
           elseif itemID then
-            if privateTooltip.SetItemByID then
-              privateTooltip:SetItemByID(itemID)
+            if GameTooltip.SetItemByID then
+              GameTooltip:SetItemByID(itemID)
             end
           end
-          privateTooltip:Show()
+          GameTooltip:Show()
         end)
         line:SetScript("OnLeave", function()
-          privateTooltip:Hide()
+          GameTooltip:Hide()
         end)
 
         -- Shift-click to remove.
