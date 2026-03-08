@@ -2,7 +2,7 @@
 ## Title: Dungeons and Raids Loot WishList
 ## Notes: Adventure Guide loot wishlist and tracker integration
 ## Author: Leonardo Leal
-## Version: 1.0.3
+## Version: 1.0.4
 ## SavedVariablesPerCharacter: LootWishListDB
 ## IconTexture: Interface\AddOns\DungeonsAndRaidsLootWishList\logo
 

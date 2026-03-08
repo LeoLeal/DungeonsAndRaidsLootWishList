@@ -9,6 +9,9 @@ local currentGroups = {}
 -- Track keys that have already appeared so we can detect newly-added items.
 local knownRowKeys = {}
 
+-- Private tooltip frame to prevent secure environment taint when hovering insecure tracker rows
+local trackerTooltip = CreateFrame("GameTooltip", "LootWishListTrackerTooltip", UIParent, "GameTooltipTemplate")
+
 -- Reference to the addon namespace, set once during Initialize.
 local ns = nil
 
@@ -68,26 +71,26 @@ local function layoutContents(self)
         end
 
 
-        -- Tooltip on hover. Uses the shared GameTooltip to prevent secure
-        -- environment taint.
+        -- Tooltip on hover. Uses our dedicated tooltip frame to prevent secure
+        -- environment taint natively without overriding global state.
         local tooltipRef = item.displayLink or item.tooltipRef
         local itemID = item.itemID
         line:SetScript("OnEnter", function(self)
           -- Set the owner to UIParent (safe/secure) instead of self (insecure)
           -- using ANCHOR_CURSOR natively handles the mouse tracking position
-          GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR")
+          trackerTooltip:SetOwner(UIParent, "ANCHOR_CURSOR")
 
           if type(tooltipRef) == "string" and tooltipRef:find("item:") then
-            GameTooltip:SetHyperlink(tooltipRef)
+            trackerTooltip:SetHyperlink(tooltipRef)
           elseif itemID then
-            if GameTooltip.SetItemByID then
-              GameTooltip:SetItemByID(itemID)
+            if trackerTooltip.SetItemByID then
+              trackerTooltip:SetItemByID(itemID)
             end
           end
-          GameTooltip:Show()
+          trackerTooltip:Show()
         end)
         line:SetScript("OnLeave", function()
-          GameTooltip:Hide()
+          trackerTooltip:Hide()
         end)
 
         -- Shift-click to remove.
