@@ -3,10 +3,6 @@ local TrackerUI = {}
 -- The native ObjectiveTracker module instance (created in Initialize).
 local wishlistModule = nil
 
--- A private tooltip to prevent taint from propagating to the global shared GameTooltip when
--- using functions like SetItemByID which can allocate table data internally.
-local trackerTooltip = CreateFrame("GameTooltip", "LootWishListTrackerTooltip", UIParent, "GameTooltipTemplate")
-
 -- Cache of the last-known set of groups so LayoutContents can render them.
 local currentGroups = {}
 
@@ -84,26 +80,27 @@ local function layoutContents(self)
             -- Only run our addon logic if this natively pooled frame currently belongs to our module.
             if not self.parentBlock or self.parentBlock.parentModule ~= wishlistModule then return end
 
-            -- Set the owner to self (insecure) instead of UIParent (secure)
-            -- anchoring to an insecure frame isolates the tooltip execution
-            trackerTooltip:SetOwner(self, "ANCHOR_CURSOR")
+            -- In Dragonflight/TWW, using GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR") taints
+            -- the tooltip layout engine because it initiates a continuous tracking loop from an insecure context.
+            -- To anchor safely, we must use a static anchor relative to our tracker line.
+            GameTooltip:SetOwner(self, "ANCHOR_LEFT")
 
             local ref = self.lootWishList_tooltipRef
             local id = self.lootWishList_itemID
 
             if type(ref) == "string" and ref:find("item:") then
-              trackerTooltip:SetHyperlink(ref)
+              GameTooltip:SetHyperlink(ref)
             elseif id then
-              if trackerTooltip.SetItemByID then
-                trackerTooltip:SetItemByID(id)
+              if GameTooltip.SetItemByID then
+                GameTooltip:SetItemByID(id)
               end
             end
-            trackerTooltip:Show()
+            GameTooltip:Show()
           end)
 
           line:HookScript("OnLeave", function(self)
             if not self.parentBlock or self.parentBlock.parentModule ~= wishlistModule then return end
-            trackerTooltip:Hide()
+            GameTooltip:Hide()
           end)
 
           -- Shift-click to remove.
