@@ -3,6 +3,10 @@ local TrackerUI = {}
 -- The native ObjectiveTracker module instance (created in Initialize).
 local wishlistModule = nil
 
+-- A private tooltip to prevent taint from propagating to the global shared GameTooltip when
+-- using functions like SetItemByID which can allocate table data internally.
+local trackerTooltip = CreateFrame("GameTooltip", "LootWishListTrackerTooltip", UIParent, "GameTooltipTemplate")
+
 -- Cache of the last-known set of groups so LayoutContents can render them.
 local currentGroups = {}
 
@@ -82,24 +86,24 @@ local function layoutContents(self)
 
             -- Set the owner to self (insecure) instead of UIParent (secure)
             -- anchoring to an insecure frame isolates the tooltip execution
-            GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+            trackerTooltip:SetOwner(self, "ANCHOR_CURSOR")
 
             local ref = self.lootWishList_tooltipRef
             local id = self.lootWishList_itemID
 
             if type(ref) == "string" and ref:find("item:") then
-              GameTooltip:SetHyperlink(ref)
+              trackerTooltip:SetHyperlink(ref)
             elseif id then
-              if GameTooltip.SetItemByID then
-                GameTooltip:SetItemByID(id)
+              if trackerTooltip.SetItemByID then
+                trackerTooltip:SetItemByID(id)
               end
             end
-            GameTooltip:Show()
+            trackerTooltip:Show()
           end)
 
           line:HookScript("OnLeave", function(self)
             if not self.parentBlock or self.parentBlock.parentModule ~= wishlistModule then return end
-            GameTooltip:Hide()
+            trackerTooltip:Hide()
           end)
 
           -- Shift-click to remove.
@@ -145,6 +149,8 @@ function TrackerUI.Initialize(namespace)
     return
   end
 
+  -- The `ns` variable is already initialized at the top of the file.
+  -- We assign the `namespace` parameter to it here to ensure it's the correct addon namespace.
   ns = namespace
 
   -- Bail out if the TWW ObjectiveTracker module system is not available.
