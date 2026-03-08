@@ -9,9 +9,6 @@ local currentGroups = {}
 -- Track keys that have already appeared so we can detect newly-added items.
 local knownRowKeys = {}
 
--- Private tooltip frame to prevent secure environment taint when hovering insecure tracker rows
-local trackerTooltip = CreateFrame("GameTooltip", "LootWishListTrackerTooltip", UIParent, "GameTooltipTemplate")
-
 -- Reference to the addon namespace, set once during Initialize.
 local ns = nil
 
@@ -25,7 +22,6 @@ local function layoutContents(self)
     return
   end
 
-  local addedNewItem = false
   local seenKeys = {}
 
   for groupIndex, group in ipairs(currentGroups) do
@@ -70,35 +66,50 @@ local function layoutContents(self)
           line.Check:Hide()
         end
 
+        -- Store item data on the line frame itself so the shared hook can access it.
+        line.lootWishList_tooltipRef = item.displayLink or item.tooltipRef
+        line.lootWishList_itemID = item.itemID
 
-        -- Tooltip on hover. Uses our dedicated tooltip frame to prevent secure
-        -- environment taint natively without overriding global state.
-        local tooltipRef = item.displayLink or item.tooltipRef
-        local itemID = item.itemID
-        line:SetScript("OnEnter", function(self)
-          -- Set the owner to UIParent (safe/secure) instead of self (insecure)
-          -- using ANCHOR_CURSOR natively handles the mouse tracking position
-          trackerTooltip:SetOwner(UIParent, "ANCHOR_CURSOR")
+        -- Native Tracker lines are securely pooled. Overwriting them with SetScript permanently
+        -- replaces their secure handler with our insecure handler, which taints them when they
+        -- recycle for secure modules like World Quests. We MUST use HookScript.
+        if not line.lootWishlistHooked then
+          line.lootWishlistHooked = true
 
-          if type(tooltipRef) == "string" and tooltipRef:find("item:") then
-            trackerTooltip:SetHyperlink(tooltipRef)
-          elseif itemID then
-            if trackerTooltip.SetItemByID then
-              trackerTooltip:SetItemByID(itemID)
+          line:HookScript("OnEnter", function(self)
+            -- Only run our addon logic if this natively pooled frame currently belongs to our module.
+            if not self.parentBlock or self.parentBlock.parentModule ~= wishlistModule then return end
+
+            -- Set the owner to self (insecure) instead of UIParent (secure)
+            -- anchoring to an insecure frame isolates the tooltip execution
+            GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+
+            local ref = self.lootWishList_tooltipRef
+            local id = self.lootWishList_itemID
+
+            if type(ref) == "string" and ref:find("item:") then
+              GameTooltip:SetHyperlink(ref)
+            elseif id then
+              if GameTooltip.SetItemByID then
+                GameTooltip:SetItemByID(id)
+              end
             end
-          end
-          trackerTooltip:Show()
-        end)
-        line:SetScript("OnLeave", function()
-          trackerTooltip:Hide()
-        end)
+            GameTooltip:Show()
+          end)
 
-        -- Shift-click to remove.
-        line:SetScript("OnMouseUp", function(_, button)
-          if button == "LeftButton" and IsShiftKeyDown() then
-            ns.RemoveTrackedItem(item.itemID)
-          end
-        end)
+          line:HookScript("OnLeave", function(self)
+            if not self.parentBlock or self.parentBlock.parentModule ~= wishlistModule then return end
+            GameTooltip:Hide()
+          end)
+
+          -- Shift-click to remove.
+          line:HookScript("OnMouseUp", function(self, button)
+            if not self.parentBlock or self.parentBlock.parentModule ~= wishlistModule then return end
+            if button == "LeftButton" and IsShiftKeyDown() and self.lootWishList_itemID then
+              ns.RemoveTrackedItem(self.lootWishList_itemID)
+            end
+          end)
+        end
       end
 
       -- New-item detection.
@@ -106,7 +117,6 @@ local function layoutContents(self)
       seenKeys[uniqueKey] = true
       if not knownRowKeys[uniqueKey] then
         knownRowKeys[uniqueKey] = true
-        addedNewItem = true
       end
     end
 
