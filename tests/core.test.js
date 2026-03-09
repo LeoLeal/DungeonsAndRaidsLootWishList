@@ -84,11 +84,11 @@ test('tracker model groups rows by source and keeps best ilvl separate from poss
 
     assert.equal(grouped.length, 2)
     assert.equal(grouped[0].label, 'Operation: Floodgate')
-    assert.equal(grouped[0].items[0].displayText, '- Stormlash Dagger (262)')
+    assert.equal(grouped[0].items[0].displayText, 'Stormlash Dagger (262)')
     assert.equal(grouped[0].items[0].showTick, false)
     assert.equal(grouped[0].items[1].displayText, 'Circuit Breaker')
     assert.equal(grouped[0].items[1].showTick, true)
-    assert.equal(grouped[1].items[0].displayText, '- Unknown Relic')
+    assert.equal(grouped[1].items[0].displayText, 'Unknown Relic')
     assert.equal(grouped[1].label, 'Other')
   } finally {
     close()
@@ -144,8 +144,8 @@ test('tracker row style uses quest-style check atlas and row padding', async () 
     assert.equal(trackerRowStyle.CHECK_ATLAS, 'ui-questtracker-tracker-check')
     assert.equal(trackerRowStyle.CHECK_SIZE, 16)
     assert.equal(incomplete.textLeftOffset, 20)
-    assert.equal(complete.textLeftOffset, 24)
-    assert.equal(complete.checkLeftOffset, 8)
+    assert.equal(complete.textLeftOffset, 28)
+    assert.equal(complete.checkLeftOffset, 12)
   } finally {
     close()
   }

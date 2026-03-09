@@ -80,10 +80,12 @@ local function layoutContents(self)
             -- Only run our addon logic if this natively pooled frame currently belongs to our module.
             if not self.parentBlock or self.parentBlock.parentModule ~= wishlistModule then return end
 
-            -- In Dragonflight/TWW, using GameTooltip:SetOwner(UIParent, "ANCHOR_CURSOR") taints
-            -- the tooltip layout engine because it initiates a continuous tracking loop from an insecure context.
-            -- To anchor safely, we must use a static anchor relative to our tracker line.
-            GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+            -- To avoid layout engine taint (attempting arithmetic on a secret number value)
+            -- when anchoring tooltips to securely pooled native tracker lines, we must
+            -- divorce the GameTooltip from the frame entirely using ANCHOR_NONE and SetPoint.
+            GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+            GameTooltip:ClearAllPoints()
+            GameTooltip:SetPoint("TOPRIGHT", self, "TOPLEFT", -10, 0)
 
             local ref = self.lootWishList_tooltipRef
             local id = self.lootWishList_itemID
