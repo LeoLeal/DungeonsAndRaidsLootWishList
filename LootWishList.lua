@@ -319,3 +319,99 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 end)
 
 eventFrame:RegisterEvent("PLAYER_LOGIN")
+
+--@do-not-package@
+-- === TEMPORARY TEST COMMAND ===
+-- Type /testroll in-game to see the "WISHLIST" tag rendered over a template GroupLootFrame
+SLASH_LOOTWISHTEST1 = "/testroll"
+SlashCmdList["LOOTWISHTEST"] = function()
+  -- Fetch a random tracked item
+  local db = LootWishListDB or { characters = {} }
+  local name = UnitName("player") or "Unknown"
+  local realm = GetRealmName() or "Unknown"
+  local charKey = string.format("%s-%s", name, realm)
+  local trackedItems = namespace.WishlistStore.getTrackedItems(db, charKey)
+
+  if not trackedItems or #trackedItems == 0 then
+    print("LootWishList: You have no items in your wishlist to test with! Add one from the Adventure Guide first.")
+    return
+  end
+
+  local randomIndex = math.random(1, #trackedItems)
+  local testItem = trackedItems[randomIndex]
+  local itemID = testItem.itemID
+  local itemLink = testItem.itemLink or
+      ("|Hitem:" .. itemID .. "::::::::70:::::|h[" .. (testItem.itemName or "Test Item") .. "]|h")
+
+  local rollID = 999
+
+  -- 1. Create a fresh test frame based on the group loot template
+  -- We name it "GroupLootFrame5" because findRollFrameById checks GroupLootFrame 1 through 4 (NUM_GROUP_LOOT_FRAMES)
+  local frame = _G["TestLootWishListRollFrame"]
+  if not frame then
+    frame = CreateFrame("Frame", "TestLootWishListRollFrame", UIParent, "GroupLootFrameTemplate")
+    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 100)
+
+    -- Strip some Native blizzard scripts that might cause errors if triggered with fake data
+    frame:SetScript("OnUpdate", nil)
+    frame:SetScript("OnShow", nil)
+    frame:SetScript("OnHide", nil)
+  end
+
+  -- Force some display properties to ensure it's visible
+  frame:SetAlpha(1)
+  frame.rollID = rollID
+
+  if frame.IconFrame and frame.IconFrame.Icon then
+    local itemIcon = GetItemIcon(itemID) or 134430
+    frame.IconFrame.Icon:SetTexture(itemIcon)
+  end
+  if frame.Name then
+    frame.Name:SetText(testItem.itemName or "Test Item")
+
+    local quality = select(3, GetItemInfo(itemLink)) or 4
+    local r, g, b = GetItemQualityColor(quality)
+    frame.Name:SetVertexColor(r, g, b)
+  end
+  if frame.Timer then
+    frame.Timer:SetValue(50) -- Half full timer
+  end
+
+  -- Force Greed button instead of Transmog
+  if frame.TransmogButton then frame.TransmogButton:Hide() end
+  if frame.GreedButton then frame.GreedButton:Show() end
+
+  frame:Show()
+
+  -- 2. Mock WoW API temporarily inside this execution scope
+  local original_GetLootRollItemLink = GetLootRollItemLink
+  GetLootRollItemLink = function(id)
+    if id == rollID then
+      return itemLink
+    end
+    return original_GetLootRollItemLink and original_GetLootRollItemLink(id) or nil
+  end
+
+  -- 3. Mock IsTrackedItem temporarily
+  local original_IsTrackedItem = namespace.IsTrackedItem
+  namespace.IsTrackedItem = function(id) return id == itemID end
+
+  -- 4. Temporary hook into findRollFrameById so our module finds our custom frame
+  -- We don't want to modify LootEvents.lua directly just for the test, so we inject the frame globally
+  -- and pretend `NUM_GROUP_LOOT_FRAMES` is 5, appending our test frame to `_G`
+  local original_NUM_GROUP_LOOT_FRAMES = NUM_GROUP_LOOT_FRAMES
+  NUM_GROUP_LOOT_FRAMES = 5
+  _G["GroupLootFrame5"] = frame
+
+  -- 5. Invoke the event handler to test the visual rendering
+  namespace.LootEvents.HandleStartLootRoll(namespace, rollID)
+
+  -- 6. Restore Original Functions
+  GetLootRollItemLink = original_GetLootRollItemLink
+  namespace.IsTrackedItem = original_IsTrackedItem
+  NUM_GROUP_LOOT_FRAMES = original_NUM_GROUP_LOOT_FRAMES
+  _G["GroupLootFrame5"] = nil -- Clean up the global taint
+
+  print("LootWishList: Created and showed a template GroupLootFrame for " .. (testItem.itemName or "Test Item") .. "!")
+end
+--@end-do-not-package@
