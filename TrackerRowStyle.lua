@@ -7,13 +7,13 @@ function TrackerRowStyle.getRowLayout(isComplete)
   if isComplete then
     return {
       checkLeftOffset = 12,
-      textLeftOffset = 28,
+      textLeftOffset = 10,
     }
   end
 
   return {
     checkLeftOffset = 8,
-    textLeftOffset = 20,
+    textLeftOffset = 10,
   }
 end
 

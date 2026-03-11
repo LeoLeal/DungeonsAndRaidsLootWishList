@@ -56,14 +56,20 @@ local function layoutContents(self)
       end
 
       local line = block:AddObjective(objectiveKey, item.displayText, nil, nil, dashStyle, colorStyle)
+      if line and line.Text then
+        line.Text:ClearAllPoints()
+        if item.isBossHeader then
+          -- Boss headers are flush with the left side (no indentation).
+          line.Text:SetPoint("TOPLEFT", line, "TOPLEFT", 0, 0)
+        else
+          -- Regular items use the standard indentation from TrackerRowStyle.
+          local layout = ns.TrackerRowStyle.getRowLayout(item.showTick)
+          line.Text:SetPoint("TOPLEFT", line, "TOPLEFT", layout.textLeftOffset, 0)
+        end
+        line.Text:SetPoint("BOTTOMRIGHT", line, "BOTTOMRIGHT", 0, 0)
+      end
 
       if line then
-        -- Apply negative indentation for boss headers.
-        if item.isBossHeader and line.Text then
-          line.Text:ClearAllPoints()
-          line.Text:SetPoint("TOPLEFT", line, "TOPLEFT", 0, 0)
-          line.Text:SetPoint("BOTTOMRIGHT", line, "BOTTOMRIGHT", 0, 0)
-        end
         -- Tick texture for possessed items — placed where the Dash was.
         if item.showTick and line.Dash then
           if not line.Check then
