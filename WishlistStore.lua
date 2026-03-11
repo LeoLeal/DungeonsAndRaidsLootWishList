@@ -10,8 +10,9 @@ end
 
 function WishlistStore.ensureCharacter(db, characterKey)
   db.characters = db.characters or {}
-  db.characters[characterKey] = db.characters[characterKey] or { items = {} }
+  db.characters[characterKey] = db.characters[characterKey] or { items = {}, collapsedGroups = {} }
   db.characters[characterKey].items = db.characters[characterKey].items or {}
+  db.characters[characterKey].collapsedGroups = db.characters[characterKey].collapsedGroups or {}
 
   return db.characters[characterKey]
 end
@@ -115,6 +116,23 @@ function WishlistStore.removeItem(db, characterKey, itemId)
   character.items[itemKey] = {
     tracked = false,
   }
+end
+
+function WishlistStore.setGroupCollapsed(db, characterKey, label, collapsed)
+  local character = WishlistStore.ensureCharacter(db, characterKey)
+  character.collapsedGroups[label] = collapsed and true or nil
+end
+
+function WishlistStore.isGroupCollapsed(db, characterKey, label)
+  local character = WishlistStore.ensureCharacter(db, characterKey)
+  return character.collapsedGroups[label] == true
+end
+
+function WishlistStore.toggleGroupCollapse(db, characterKey, label)
+  local character = WishlistStore.ensureCharacter(db, characterKey)
+  local currentState = character.collapsedGroups[label] == true
+  WishlistStore.setGroupCollapsed(db, characterKey, label, not currentState)
+  return not currentState
 end
 
 function WishlistStore.getTrackedItems(db, characterKey)

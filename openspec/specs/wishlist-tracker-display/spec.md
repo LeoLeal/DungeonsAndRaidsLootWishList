@@ -107,3 +107,52 @@ The addon SHALL prefer Blizzard-provided UI assets and visual patterns for track
 
 - **WHEN** the addon renders a wishlist row in the objective tracker
 - **THEN** it uses native Blizzard visual patterns where practical instead of bespoke addon-specific visuals
+
+### Requirement: Source groups are collapsible
+
+The wishlist tracker SHALL allow each source group (dungeon, raid, Other) to be collapsed or expanded independently.
+
+#### Scenario: Collapse a group
+
+- **WHEN** the user clicks the collapse button on a source group header
+- **THEN** the group's items are hidden from view
+- **AND** the collapse button changes to expand button (showing +)
+- **AND** the group header displays the item count in parentheses
+
+#### Scenario: Expand a group
+
+- **WHEN** the user clicks the expand button on a collapsed source group header
+- **THEN** the group's items are displayed
+- **AND** the expand button changes to collapse button (showing −)
+- **AND** the group header displays just the group name without item count
+
+#### Scenario: Collapse state persists across sessions
+
+- **WHEN** the user collapses a group and relogs or reloads the UI
+- **THEN** the group remains collapsed in the same state
+
+### Requirement: Item count displays for collapsed groups
+
+When a source group is collapsed, the group header SHALL display the number of items in that group.
+
+#### Scenario: Collapsed group shows count
+
+- **GIVEN** a source group with 3 tracked items is collapsed
+- **WHEN** the group is rendered
+- **THEN** the header displays as "Group Name (3)"
+
+### Requirement: Collapse button uses native visual style
+
+The collapse/expand buttons SHALL match the visual style of native WoW Objective Tracker buttons.
+
+#### Scenario: Button uses native atlases
+
+- **WHEN** the collapse button is rendered
+- **THEN** it uses atlas "ui-questtrackerbutton-secondary-collapse" for normal state
+- **AND** uses atlas "ui-questtrackerbutton-secondary-collapse-pressed" for pushed state
+
+#### Scenario: Button is positioned at right edge of header
+
+- **WHEN** the collapse/expand button is created
+- **THEN** it is anchored to the right edge of the block header
+- **AND** the group title text is positioned to the left of the button
