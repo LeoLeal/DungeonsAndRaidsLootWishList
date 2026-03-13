@@ -32,6 +32,20 @@ local function getLocaleId()
   return "enUS"
 end
 
+-- Queue a callback to execute after combat ends.
+-- If not in combat, executes immediately.
+-- If in combat, waits and re-checks until combat ends.
+local function QueueAfterCombat(callback)
+  if InCombatLockdown() then
+    C_Timer.After(1, function()
+      QueueAfterCombat(callback)
+    end)
+  else
+    callback()
+  end
+end
+namespace.QueueAfterCombat = QueueAfterCombat
+
 local function getCurrentDb()
   LootWishListDB = LootWishListDB or { characters = {} }
   return LootWishListDB
@@ -345,6 +359,7 @@ local function registerEvents()
   eventFrame:RegisterEvent("BANKFRAME_OPENED")
   eventFrame:RegisterEvent("BANKFRAME_CLOSED")
   eventFrame:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
+  eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 end
 
 eventFrame:SetScript("OnEvent", function(_, event, ...)
@@ -360,12 +375,24 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 
   if event == "CHAT_MSG_LOOT" then
     namespace.LootEvents.HandleChatLoot(namespace, ...)
-    namespace.RefreshAll()
+    -- Defer refresh during combat - non-critical update
+    if not InCombatLockdown() then
+      namespace.RefreshAll()
+    else
+      QueueAfterCombat(function() namespace.RefreshAll() end)
+    end
     return
   end
 
   if event == "START_LOOT_ROLL" then
-    namespace.LootEvents.HandleStartLootRoll(namespace, ...)
+    -- Capture the rollID argument
+    local rollID = ...
+    -- Defer loot roll UI updates during combat
+    if not InCombatLockdown() then
+      namespace.LootEvents.HandleStartLootRoll(namespace, rollID)
+    else
+      QueueAfterCombat(function() namespace.LootEvents.HandleStartLootRoll(namespace, rollID) end)
+    end
     return
   end
 
@@ -380,7 +407,17 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     return
   end
 
-  namespace.RefreshAll()
+  if event == "PLAYER_REGEN_ENABLED" then
+    -- Player left combat - refresh to catch any deferred updates
+    namespace.RefreshAll()
+    return
+  end
+
+  -- For BAG_UPDATE_DELAYED, PLAYER_EQUIPMENT_CHANGED, and other inventory events:
+  -- Skip non-critical refreshes during combat
+  if not InCombatLockdown() then
+    namespace.RefreshAll()
+  end
 end)
 
 eventFrame:RegisterEvent("PLAYER_LOGIN")

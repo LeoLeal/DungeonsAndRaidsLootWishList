@@ -59,7 +59,13 @@ local function layoutContents(self)
   local db = LootWishListDB
 
   for groupIndex, group in ipairs(currentGroups) do
-    local itemCount = #group.items
+    -- Count actual items, excluding boss header rows
+    local itemCount = 0
+    for _, item in ipairs(group.items) do
+      if not item.isBossHeader then
+        itemCount = itemCount + 1
+      end
+    end
     if itemCount > 0 then
       local block = self:GetBlock(group.label)
       local isCollapsed = ns.WishlistStore.isGroupCollapsed(db, charKey, group.label)
@@ -86,6 +92,8 @@ local function layoutContents(self)
       button:SetNormalAtlas(isCollapsed and EXPAND_ATLAS or COLLAPSE_ATLAS)
       button:SetPushedAtlas(isCollapsed and (EXPAND_ATLAS .. "-pressed") or (COLLAPSE_ATLAS .. "-pressed"))
 
+      -- Use SetScript for our custom button (not inherited from secure template).
+      -- HookScript requires an existing handler which custom buttons don't have.
       button:SetScript("OnClick", function()
         ns.WishlistStore.toggleGroupCollapse(db, charKey, group.label)
         wishlistModule:MarkDirty()
@@ -162,6 +170,9 @@ local function layoutContents(self)
                 -- Disable tooltip for boss headers.
                 if self.lootWishList_isBossHeader then return end
 
+                -- Prevent showing tooltips during combat to avoid interfering with combat UI.
+                if InCombatLockdown() then return end
+
                 -- To avoid layout engine taint (attempting arithmetic on a secret number value)
                 -- when anchoring tooltips to securely pooled native tracker lines, we must
                 -- divorce the GameTooltip from the frame entirely using ANCHOR_NONE and SetPoint.
@@ -182,6 +193,7 @@ local function layoutContents(self)
 
               line:HookScript("OnLeave", function(self)
                 if not self.parentBlock or self.parentBlock.parentModule ~= wishlistModule then return end
+                -- Always hide tooltip on leave, even during combat
                 trackerTooltip:Hide()
               end)
 

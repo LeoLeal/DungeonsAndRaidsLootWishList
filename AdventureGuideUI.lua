@@ -158,8 +158,8 @@ local function ensureCheckbox(namespace, lootButton)
   end
 
   checkbox = CreateFrame("CheckButton", nil, lootButton, "UICheckButtonTemplate")
-  checkbox:SetSize(20, 20)
-  checkbox:SetScript("OnClick", function(self)
+  checkbox:SetSize(24, 24)
+  checkbox:HookScript("OnClick", function(self)
     if self.isUpdating or not self.itemData then
       return
     end
@@ -176,9 +176,9 @@ local function positionCheckbox(lootButton, checkbox)
 
   local textRegion = getPrimaryTextRegion(lootButton)
   if textRegion then
-    checkbox:SetPoint("LEFT", textRegion, "RIGHT", 6, 0)
+    checkbox:SetPoint("LEFT", textRegion, "RIGHT", 0, 0)
   else
-    checkbox:SetPoint("RIGHT", lootButton, "RIGHT", -2, 0)
+    checkbox:SetPoint("RIGHT", lootButton, "RIGHT", 0, 0)
   end
 end
 
