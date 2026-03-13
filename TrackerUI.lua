@@ -38,7 +38,7 @@ local function getOrCreateCollapseButton(block)
   button:SetPushedAtlas("ui-questtrackerbutton-secondary-collapse-pressed")
 
   -- Ensure the button is clickable over the header text/frame.
-  button:SetFrameLevel(block:GetFrameLevel() + 10)
+  button:SetFrameLevel(block:GetFrameLevel() + 20)
 
   block.collapseButton = button
   return button
@@ -80,23 +80,65 @@ local function layoutContents(self)
       block.lootWishlist_instanceID = group.instanceID
       block.lootWishlist_groupLabel = group.label
 
-      if not block.lootWishlistHeaderHooked then
-        block.lootWishlistHeaderHooked = true
-        hooksecurefunc(block, "OnHeaderClick", function(ownerBlock, button)
+      -- Create an insecure child frame to handle header clicks without tainting the secure pooled block.
+      if not block.headerClickHandler then
+        block.headerClickHandler = CreateFrame("Button", nil, block)
+        
+        -- Set fixed position and size to match native header
+        block.headerClickHandler:SetPoint("TOPLEFT", block, "TOPLEFT", 0, 0)
+        block.headerClickHandler:SetPoint("RIGHT", block, "RIGHT", -20, 0)
+        block.headerClickHandler:SetHeight(20)
+        
+        block.headerClickHandler:SetFrameLevel(block:GetFrameLevel() + 15)
+        block.headerClickHandler:EnableMouse(true)
+        block.headerClickHandler:RegisterForClicks("LeftButtonUp")
+        
+        -- Forward mouse events to show native highlight
+        block.headerClickHandler:SetScript("OnEnter", function(self)
+          if block.HeaderButton and block.HeaderButton.OnEnter then
+            block.HeaderButton:OnEnter()
+          elseif block.Header and block.Header.OnEnter then
+            block.Header:OnEnter()
+          end
+        end)
+
+        block.headerClickHandler:SetScript("OnLeave", function(self)
+          if block.HeaderButton and block.HeaderButton.OnLeave then
+            block.HeaderButton:OnLeave()
+          elseif block.Header and block.Header.OnLeave then
+            block.Header:OnLeave()
+          end
+        end)
+        
+        block.headerClickHandler:SetScript("OnClick", function(self, button)
           if button ~= "LeftButton" then
             return
           end
 
-          local instanceID = ownerBlock.lootWishlist_instanceID
+          local instanceID = block.lootWishlist_instanceID
 
           if type(instanceID) ~= "number" or instanceID <= 0 then
             return
           end
 
-          if ownerBlock.lootWishlist_groupLabel == ns.GetText("OTHER") then
+          if block.lootWishlist_groupLabel == ns.GetText("OTHER") then
             return
           end
 
+          -- Toggle: close if same instance is open, otherwise switch or open
+          if EncounterJournal and EncounterJournal:IsShown() then
+            local currentInstanceID = EncounterJournal.instanceID
+            -- If same instance is already open, close it
+            if currentInstanceID == instanceID then
+              if type(EncounterJournal.Hide) == "function" then
+                EncounterJournal:Hide()
+              end
+              return
+            end
+            -- Different instance is open - will switch below
+          end
+
+          -- Open or switch to the clicked instance
           if type(EncounterJournal_OpenJournal) ~= "function" then
             if C_AddOns and type(C_AddOns.LoadAddOn) == "function" then
               C_AddOns.LoadAddOn("Blizzard_EncounterJournal")
@@ -200,10 +242,15 @@ local function layoutContents(self)
               line.tooltipTrigger:SetAllPoints(line)
               line.tooltipTrigger:EnableMouse(true)
               line.tooltipTrigger:SetFrameLevel(line:GetFrameLevel() + 5)
-              
-              -- Store item data on the trigger for easy access
-              line.tooltipTrigger.itemID = item.itemID
-              line.tooltipTrigger.isBossHeader = item.isBossHeader
+            end
+
+            -- Always update item data in case line is recycled
+            line.tooltipTrigger.itemID = item.itemID
+            line.tooltipTrigger.isBossHeader = item.isBossHeader
+            line.tooltipTrigger.tooltipRef = item.displayLink or item.tooltipRef
+
+            if not line.tooltipTrigger.handlersSet then
+              line.tooltipTrigger.handlersSet = true
 
               line.tooltipTrigger:SetScript("OnEnter", function(self)
                 if InCombatLockdown() then return end
@@ -215,7 +262,11 @@ local function layoutContents(self)
                 trackerTooltip:ClearAllPoints()
                 trackerTooltip:SetPoint("TOPRIGHT", line, "TOPLEFT", -4, 0)
 
-                if trackerTooltip.SetItemByID then
+                -- Use the journal item link if available (contains difficulty info),
+                -- otherwise fall back to itemID
+                if self.tooltipRef and type(self.tooltipRef) == "string" then
+                  trackerTooltip:SetHyperlink(self.tooltipRef)
+                elseif trackerTooltip.SetItemByID then
                   trackerTooltip:SetItemByID(self.itemID)
                 end
                 trackerTooltip:Show()
