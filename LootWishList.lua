@@ -307,6 +307,7 @@ function namespace.BuildTrackerGroups()
       itemID = item.itemID,
       itemName = itemName,
       groupLabel = groupLabel,
+      instanceID = item.instanceID,
       isPossessed = namespace.state.possessed[key] == true,
       bestLootedItemLevel = item.bestLootedItemLevel,
       bossName = bossName,

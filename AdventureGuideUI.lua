@@ -187,6 +187,11 @@ function AdventureGuideUI.Refresh(namespace)
     return
   end
 
+  -- Only show checkboxes on Dungeons and Raids tabs, not on Item Sets/Journeys
+  local isDungeonTab = type(EncounterJournal_IsDungeonTabSelected) == "function" and EncounterJournal_IsDungeonTabSelected(EncounterJournal)
+  local isRaidTab = type(EncounterJournal_IsRaidTabSelected) == "function" and EncounterJournal_IsRaidTabSelected(EncounterJournal)
+  local shouldShowCheckboxes = isDungeonTab or isRaidTab
+
   local frame = nil
   while true do
     frame = EnumerateFrames(frame)
@@ -194,16 +199,24 @@ function AdventureGuideUI.Refresh(namespace)
       break
     end
 
-    if frame:IsShown() and frame:GetObjectType() == "Button" and isEncounterJournalDescendant(frame) and isLikelyLootButton(frame) then
-      local itemData = buildItemData(namespace, frame)
-      if itemData then
-        local checkbox = ensureCheckbox(namespace, frame)
-        positionCheckbox(frame, checkbox)
-        checkbox.itemData = itemData
-        checkbox.isUpdating = true
-        checkbox:SetChecked(namespace.IsTrackedItem(itemData.itemID))
-        checkbox.isUpdating = false
-        checkbox:Show()
+    if frame:IsShown() and frame:GetObjectType() == "Button" and isEncounterJournalDescendant(frame) then
+      -- Hide our checkboxes if not on dungeon/raid tabs
+      local checkbox = frame.LootWishListCheckbox
+      if checkbox and not shouldShowCheckboxes then
+        checkbox:Hide()
+      end
+
+      if shouldShowCheckboxes and isLikelyLootButton(frame) then
+        local itemData = buildItemData(namespace, frame)
+        if itemData then
+          checkbox = ensureCheckbox(namespace, frame)
+          positionCheckbox(frame, checkbox)
+          checkbox.itemData = itemData
+          checkbox.isUpdating = true
+          checkbox:SetChecked(namespace.IsTrackedItem(itemData.itemID))
+          checkbox.isUpdating = false
+          checkbox:Show()
+        end
       end
     end
   end

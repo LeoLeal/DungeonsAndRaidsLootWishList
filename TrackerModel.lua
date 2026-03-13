@@ -29,6 +29,10 @@ local function buildDisplayText(item, skipBoss)
   return text
 end
 
+local function isValidInstanceID(instanceID)
+  return type(instanceID) == "number" and instanceID > 0
+end
+
 function TrackerModel.buildGroups(items, otherLabel)
   local groupsByLabel = {}
   otherLabel = otherLabel or "Other"
@@ -41,11 +45,16 @@ function TrackerModel.buildGroups(items, otherLabel)
         label = label,
         items = {},
         isRaid = false, -- Will be set if any item has a bossName
+        instanceID = nil,
       }
     end
 
     if item.bossName and item.bossName ~= "" then
       groupsByLabel[label].isRaid = true
+    end
+
+    if groupsByLabel[label].instanceID == nil and isValidInstanceID(item.instanceID) then
+      groupsByLabel[label].instanceID = item.instanceID
     end
 
     table.insert(groupsByLabel[label].items, item)
@@ -124,9 +133,11 @@ function TrackerModel.buildGroups(items, otherLabel)
       end
     end
 
+    local instanceID = isValidInstanceID(group.instanceID) and group.instanceID or nil
     table.insert(orderedGroups, {
       label = group.label,
       items = flattenedItems,
+      instanceID = instanceID,
     })
   end
 

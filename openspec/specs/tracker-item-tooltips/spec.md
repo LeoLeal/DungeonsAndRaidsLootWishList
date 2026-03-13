@@ -18,14 +18,14 @@ When the user hovers a tracked item row in the `Loot Wishlist` section, the addo
 - **WHEN** the user hovers a tracked item row and the addon cannot resolve a usable item reference
 - **THEN** the addon does not show custom fallback tooltip text
 
-### Requirement: Tracker row tooltips use the game's default anchor behavior
+### Requirement: Tracker row tooltips use a custom anchor positioned near the row
 
-The addon SHALL use the game's default item-tooltip anchor behavior for wishlist tracker rows and SHALL NOT force a custom anchor relative to the tracker row.
+The addon SHALL anchor wishlist tracker row tooltips so the tooltip's top-right corner aligns to the row's top-left corner with a 4px horizontal gap, while keeping the tooltip owned by UIParent.
 
 #### Scenario: Hover tracked row
 
 - **WHEN** the user hovers a tracked item row in the `Loot Wishlist` section
-- **THEN** the tooltip uses Blizzard's default anchor behavior rather than a tracker-specific custom anchor
+- **THEN** the tooltip is anchored to the row with its top-right aligned to the row top-left with a 4px horizontal gap
 
 ### Requirement: Tooltip content remains purely Blizzard-native
 

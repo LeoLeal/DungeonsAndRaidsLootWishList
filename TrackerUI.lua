@@ -77,6 +77,42 @@ local function layoutContents(self)
       end
       block:SetHeader(headerText)
 
+      block.lootWishlist_instanceID = group.instanceID
+      block.lootWishlist_groupLabel = group.label
+
+      if not block.lootWishlistHeaderHooked then
+        block.lootWishlistHeaderHooked = true
+        hooksecurefunc(block, "OnHeaderClick", function(ownerBlock, button)
+          if button ~= "LeftButton" then
+            return
+          end
+
+          local instanceID = ownerBlock.lootWishlist_instanceID
+
+          if type(instanceID) ~= "number" or instanceID <= 0 then
+            return
+          end
+
+          if ownerBlock.lootWishlist_groupLabel == ns.GetText("OTHER") then
+            return
+          end
+
+          if type(EncounterJournal_OpenJournal) ~= "function" then
+            if C_AddOns and type(C_AddOns.LoadAddOn) == "function" then
+              C_AddOns.LoadAddOn("Blizzard_EncounterJournal")
+            end
+          end
+
+          if type(EncounterJournal_OpenJournal) == "function" then
+            EncounterJournal_OpenJournal(nil, instanceID)
+            -- Force Loot tab after opening instance (EncounterJournal_OpenJournal may reset tab)
+            if EncounterJournal and EncounterJournal.encounter and EncounterJournal.encounter.info and EncounterJournal.encounter.info.lootTab then
+              EncounterJournal.encounter.info.lootTab:Click()
+            end
+          end
+        end)
+      end
+
       -- Setup collapse button.
       block:AdjustRightEdgeOffset(-20)
       local button = getOrCreateCollapseButton(block)
@@ -176,7 +212,9 @@ local function layoutContents(self)
                 -- To avoid layout engine taint (attempting arithmetic on a secret number value)
                 -- when anchoring tooltips to securely pooled native tracker lines, we must
                 -- divorce the GameTooltip from the frame entirely using ANCHOR_NONE and SetPoint.
-                trackerTooltip:SetOwner(UIParent, "ANCHOR_CURSOR")
+                trackerTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+                trackerTooltip:ClearAllPoints()
+                trackerTooltip:SetPoint("TOPRIGHT", self, "TOPLEFT", -4, 0)
 
                 local ref = self.lootWishList_tooltipRef
                 local id = self.lootWishList_itemID
