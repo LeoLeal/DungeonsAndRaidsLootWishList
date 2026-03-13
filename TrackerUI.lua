@@ -193,51 +193,41 @@ local function layoutContents(self)
             line.lootWishList_itemID = item.itemID
             line.lootWishList_isBossHeader = item.isBossHeader
 
-            -- Native Tracker lines are securely pooled. Overwriting them with SetScript permanently
-            -- replaces their secure handler with our insecure handler, which taints them when they
-            -- recycle for secure modules like World Quests. We MUST use HookScript.
-            if not line.lootWishlistHooked then
-              line.lootWishlistHooked = true
+            -- Create an insecure child frame to handle mouse events without tainting the secure pooled line.
+            -- This avoids taint propagation to other secure systems like GameTooltip.
+            if not line.tooltipTrigger then
+              line.tooltipTrigger = CreateFrame("Frame", nil, line)
+              line.tooltipTrigger:SetAllPoints(line)
+              line.tooltipTrigger:EnableMouse(true)
+              line.tooltipTrigger:SetFrameLevel(line:GetFrameLevel() + 5)
+              
+              -- Store item data on the trigger for easy access
+              line.tooltipTrigger.itemID = item.itemID
+              line.tooltipTrigger.isBossHeader = item.isBossHeader
 
-              line:HookScript("OnEnter", function(self)
-                -- Only run our addon logic if this natively pooled frame currently belongs to our module.
-                if not self.parentBlock or self.parentBlock.parentModule ~= wishlistModule then return end
-
-                -- Disable tooltip for boss headers.
-                if self.lootWishList_isBossHeader then return end
-
-                -- Prevent showing tooltips during combat to avoid interfering with combat UI.
+              line.tooltipTrigger:SetScript("OnEnter", function(self)
                 if InCombatLockdown() then return end
+                if self.isBossHeader then return end
+                if not self.itemID then return end
 
-                -- To avoid layout engine taint (attempting arithmetic on a secret number value)
-                -- when anchoring tooltips to securely pooled native tracker lines, we must
-                -- divorce the GameTooltip from the frame entirely using ANCHOR_NONE and SetPoint.
-                trackerTooltip:SetOwner(UIParent, "ANCHOR_CURSOR")
+                -- Position and show tooltip
+                trackerTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+                trackerTooltip:ClearAllPoints()
+                trackerTooltip:SetPoint("TOPRIGHT", line, "TOPLEFT", -4, 0)
 
-                local ref = self.lootWishList_tooltipRef
-                local id = self.lootWishList_itemID
-
-                if type(ref) == "string" and ref:find("item:") then
-                  trackerTooltip:SetHyperlink(ref)
-                elseif id then
-                  if trackerTooltip.SetItemByID then
-                    trackerTooltip:SetItemByID(id)
-                  end
+                if trackerTooltip.SetItemByID then
+                  trackerTooltip:SetItemByID(self.itemID)
                 end
                 trackerTooltip:Show()
               end)
 
-              line:HookScript("OnLeave", function(self)
-                if not self.parentBlock or self.parentBlock.parentModule ~= wishlistModule then return end
-                -- Always hide tooltip on leave, even during combat
+              line.tooltipTrigger:SetScript("OnLeave", function(self)
                 trackerTooltip:Hide()
               end)
 
-              -- Shift-click to remove.
-              line:HookScript("OnMouseUp", function(self, button)
-                if not self.parentBlock or self.parentBlock.parentModule ~= wishlistModule then return end
-                if button == "LeftButton" and IsShiftKeyDown() and self.lootWishList_itemID then
-                  ns.RemoveTrackedItem(self.lootWishList_itemID)
+              line.tooltipTrigger:SetScript("OnMouseUp", function(self, button)
+                if button == "LeftButton" and IsShiftKeyDown() and self.itemID then
+                  ns.RemoveTrackedItem(self.itemID)
                 end
               end)
             end
