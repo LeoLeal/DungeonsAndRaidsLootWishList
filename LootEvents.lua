@@ -121,45 +121,47 @@ local function getLootPatterns()
 end
 
 function LootEvents.HandleChatLoot(namespace, message, playerNameEvent)
-  local function ProcessLootChat()
-    if type(message) ~= "string" then
-      return
-    end
+  -- Process immediately to avoid accessing tainted message later
+  if type(message) ~= "string" then
+    return
+  end
 
-    local playerMatch, itemLink
-    for _, pattern in ipairs(getLootPatterns()) do
-      local match1, match2 = message:match(pattern)
-      if match1 then
-        if match1:find("|Hitem:") then
-          itemLink = match1
-          playerMatch = match2
-        elseif match2 and match2:find("|Hitem:") then
-          itemLink = match2
-          playerMatch = match1
-        end
-        if itemLink then
-          break
-        end
+  local playerMatch, itemLink
+  for _, pattern in ipairs(getLootPatterns()) do
+    local match1, match2 = message:match(pattern)
+    if match1 then
+      if match1:find("|Hitem:") then
+        itemLink = match1
+        playerMatch = match2
+      elseif match2 and match2:find("|Hitem:") then
+        itemLink = match2
+        playerMatch = match1
+      end
+      if itemLink then
+        break
       end
     end
+  end
 
-    if not itemLink then
-      return
-    end
+  if not itemLink then
+    return
+  end
 
-    local itemID = namespace.ItemResolver.getItemIdFromLink(itemLink)
-    if not itemID or not namespace.IsTrackedItem(itemID) then
-      return
-    end
+  local itemID = namespace.ItemResolver.getItemIdFromLink(itemLink)
+  if not itemID or not namespace.IsTrackedItem(itemID) then
+    return
+  end
 
-    local player = (playerMatch and playerMatch ~= "") and playerMatch or playerNameEvent
-    player = player and Ambiguate(player, "short") or nil
-    local selfName = UnitName("player")
+  local player = (playerMatch and playerMatch ~= "") and playerMatch or playerNameEvent
+  player = player and Ambiguate(player, "short") or nil
+  local selfName = UnitName("player")
 
-    if player and selfName and player == selfName then
-      return
-    end
+  if player and selfName and player == selfName then
+    return
+  end
 
+  -- Show dialog - defer if in combat to avoid taint
+  local function ShowPopup()
     if player and itemLink then
       namespace.ShowLootDialog(player, itemLink)
     else
@@ -174,8 +176,8 @@ function LootEvents.HandleChatLoot(namespace, message, playerNameEvent)
     end
   end
 
-  -- Defer processing if in combat to avoid taint
-  DeferUntilOutOfCombat(ProcessLootChat)
+  -- Defer only the popup if in combat
+  DeferUntilOutOfCombat(ShowPopup)
 end
 
 local _, namespace = ...
