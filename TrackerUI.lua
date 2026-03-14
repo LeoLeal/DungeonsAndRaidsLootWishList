@@ -97,6 +97,20 @@ local function layoutContents(self)
             return
           end
 
+          -- Toggle: close if same instance is open, otherwise switch or open
+          if EncounterJournal and EncounterJournal:IsShown() then
+            local currentInstanceID = EncounterJournal.instanceID
+            -- If same instance is already open, close it
+            if currentInstanceID == instanceID then
+              if type(EncounterJournal.Hide) == "function" then
+                EncounterJournal:Hide()
+              end
+              return
+            end
+            -- Different instance is open - will switch below
+          end
+
+          -- Open or switch to the clicked instance
           if type(EncounterJournal_OpenJournal) ~= "function" then
             if C_AddOns and type(C_AddOns.LoadAddOn) == "function" then
               C_AddOns.LoadAddOn("Blizzard_EncounterJournal")
