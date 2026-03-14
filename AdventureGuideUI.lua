@@ -159,7 +159,7 @@ local function ensureCheckbox(namespace, lootButton)
 
   checkbox = CreateFrame("CheckButton", nil, lootButton, "UICheckButtonTemplate")
   checkbox:SetSize(24, 24)
-  checkbox:HookScript("OnClick", function(self)
+  checkbox:SetScript("OnClick", function(self)
     if self.isUpdating or not self.itemData then
       return
     end

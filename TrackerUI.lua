@@ -3,8 +3,8 @@ local TrackerUI = {}
 -- The native ObjectiveTracker module instance (created in Initialize).
 local wishlistModule = nil
 
--- A private tooltip to prevent taint from propagating to the global shared GameTooltip when
--- using functions like SetItemByID which can allocate table data internally.
+-- A private tooltip to display item tooltips with correct difficulty item levels.
+-- Using GameTooltipTemplate and SetHyperlink with journal item links.
 local trackerTooltip = CreateFrame("GameTooltip", "LootWishListTrackerTooltip", UIParent, "GameTooltipTemplate")
 
 -- Cache of the last-known set of groups so LayoutContents can render them.
@@ -12,6 +12,11 @@ local currentGroups = {}
 
 -- Track keys that have already appeared so we can detect newly-added items.
 local knownRowKeys = {}
+
+-- Store custom UI elements in separate tables to avoid tainting secure pooled frames.
+-- Keys are the secure block/line references, values are our custom elements.
+local blockHandlers = {}  -- block -> { headerClickHandler, collapseButton, instanceID, groupLabel }
+local lineHandlers = {}   -- line -> { tooltipTrigger, Check }
 
 -- Reference to the addon namespace, set once during Initialize.
 local ns = nil
@@ -27,8 +32,9 @@ local function getCharacterKey()
 end
 
 local function getOrCreateCollapseButton(block)
-  if block.collapseButton then
-    return block.collapseButton
+  local handlers = blockHandlers[block]
+  if handlers and handlers.collapseButton then
+    return handlers.collapseButton
   end
 
   local button = CreateFrame("Button", nil, block)
@@ -38,9 +44,15 @@ local function getOrCreateCollapseButton(block)
   button:SetPushedAtlas("ui-questtrackerbutton-secondary-collapse-pressed")
 
   -- Ensure the button is clickable over the header text/frame.
-  button:SetFrameLevel(block:GetFrameLevel() + 20)
+  -- Use fixed frame level to avoid calling GetFrameLevel on secure block
+  button:SetFrameLevel(100)
 
-  block.collapseButton = button
+  -- Store in separate table to avoid tainting secure block
+  if not handlers then
+    handlers = {}
+    blockHandlers[block] = handlers
+  end
+  handlers.collapseButton = button
   return button
 end
 
@@ -77,51 +89,47 @@ local function layoutContents(self)
       end
       block:SetHeader(headerText)
 
-      block.lootWishlist_instanceID = group.instanceID
-      block.lootWishlist_groupLabel = group.label
+      -- Get or create handlers table for this block
+      local handlers = blockHandlers[block]
+      if not handlers then
+        handlers = { instanceID = group.instanceID, groupLabel = group.label }
+        blockHandlers[block] = handlers
+      else
+        -- Update data in case block is recycled
+        handlers.instanceID = group.instanceID
+        handlers.groupLabel = group.label
+      end
 
-      -- Create an insecure child frame to handle header clicks without tainting the secure pooled block.
-      if not block.headerClickHandler then
-        block.headerClickHandler = CreateFrame("Button", nil, block)
+      -- Create header click handler if needed
+      if not handlers.headerClickHandler then
+        handlers.headerClickHandler = CreateFrame("Button", nil, block)
         
         -- Set fixed position and size to match native header
-        block.headerClickHandler:SetPoint("TOPLEFT", block, "TOPLEFT", 0, 0)
-        block.headerClickHandler:SetPoint("RIGHT", block, "RIGHT", -20, 0)
-        block.headerClickHandler:SetHeight(20)
-        
-        block.headerClickHandler:SetFrameLevel(block:GetFrameLevel() + 15)
-        block.headerClickHandler:EnableMouse(true)
-        block.headerClickHandler:RegisterForClicks("LeftButtonUp")
-        
-        -- Forward mouse events to show native highlight
-        block.headerClickHandler:SetScript("OnEnter", function(self)
-          if block.HeaderButton and block.HeaderButton.OnEnter then
-            block.HeaderButton:OnEnter()
-          elseif block.Header and block.Header.OnEnter then
-            block.Header:OnEnter()
-          end
-        end)
+        handlers.headerClickHandler:SetPoint("TOPLEFT", block, "TOPLEFT", 0, 0)
+        handlers.headerClickHandler:SetPoint("RIGHT", block, "RIGHT", -20, 0)
+        handlers.headerClickHandler:SetHeight(20)
 
-        block.headerClickHandler:SetScript("OnLeave", function(self)
-          if block.HeaderButton and block.HeaderButton.OnLeave then
-            block.HeaderButton:OnLeave()
-          elseif block.Header and block.Header.OnLeave then
-            block.Header:OnLeave()
-          end
-        end)
-        
-        block.headerClickHandler:SetScript("OnClick", function(self, button)
+        -- Use fixed frame level to avoid calling GetFrameLevel on secure block
+        handlers.headerClickHandler:SetFrameLevel(100)
+        handlers.headerClickHandler:EnableMouse(true)
+        handlers.headerClickHandler:RegisterForClicks("LeftButtonUp")
+
+        -- Note: We don't forward to native header handlers to avoid potential taint
+        -- from calling methods on secure pooled frames. The click handler below handles
+        -- opening the Adventure Guide.
+
+        handlers.headerClickHandler:SetScript("OnClick", function(self, button)
           if button ~= "LeftButton" then
             return
           end
 
-          local instanceID = block.lootWishlist_instanceID
+          local instanceID = handlers.instanceID
 
           if type(instanceID) ~= "number" or instanceID <= 0 then
             return
           end
 
-          if block.lootWishlist_groupLabel == ns.GetText("OTHER") then
+          if handlers.groupLabel == ns.GetText("OTHER") then
             return
           end
 
@@ -216,51 +224,53 @@ local function layoutContents(self)
           end
 
           if line then
-            -- Tick texture for possessed items — placed where the Dash was.
-            if item.showTick and line.Dash then
-              if not line.Check then
-                line.Check = line:CreateTexture(nil, "ARTWORK")
-              end
-              line.Check:SetSize(ns.TrackerRowStyle.CHECK_SIZE, ns.TrackerRowStyle.CHECK_SIZE)
-              line.Check:ClearAllPoints()
-              line.Check:SetPoint("CENTER", line.Dash, "CENTER", -4, 0)
-              line.Check:SetAtlas(ns.TrackerRowStyle.CHECK_ATLAS, false)
-              line.Check:Show()
-            elseif line.Check then
-              line.Check:Hide()
+            -- Get or create handlers table for this line
+            local lh = lineHandlers[line]
+            if not lh then
+              lh = {}
+              lineHandlers[line] = lh
             end
 
-            -- Store item data on the line frame itself so the shared hook can access it.
-            line.lootWishList_tooltipRef = item.displayLink or item.tooltipRef
-            line.lootWishList_itemID = item.itemID
-            line.lootWishList_isBossHeader = item.isBossHeader
+            -- Tick texture for possessed items — placed where the Dash was.
+            if item.showTick and line.Dash then
+              if not lh.Check then
+                lh.Check = line:CreateTexture(nil, "ARTWORK")
+              end
+              lh.Check:SetSize(ns.TrackerRowStyle.CHECK_SIZE, ns.TrackerRowStyle.CHECK_SIZE)
+              lh.Check:ClearAllPoints()
+              lh.Check:SetPoint("CENTER", line.Dash, "CENTER", -4, 0)
+              lh.Check:SetAtlas(ns.TrackerRowStyle.CHECK_ATLAS, false)
+              lh.Check:Show()
+            elseif lh.Check then
+              lh.Check:Hide()
+            end
 
             -- Create an insecure child frame to handle mouse events without tainting the secure pooled line.
             -- This avoids taint propagation to other secure systems like GameTooltip.
-            if not line.tooltipTrigger then
-              line.tooltipTrigger = CreateFrame("Frame", nil, line)
-              line.tooltipTrigger:SetAllPoints(line)
-              line.tooltipTrigger:EnableMouse(true)
-              line.tooltipTrigger:SetFrameLevel(line:GetFrameLevel() + 5)
+            if not lh.tooltipTrigger then
+              lh.tooltipTrigger = CreateFrame("Frame", nil, line)
+              lh.tooltipTrigger:SetAllPoints(line)
+              lh.tooltipTrigger:EnableMouse(true)
+              -- Use fixed frame level to avoid calling GetFrameLevel on secure line
+              lh.tooltipTrigger:SetFrameLevel(50)
             end
 
             -- Always update item data in case line is recycled
-            line.tooltipTrigger.itemID = item.itemID
-            line.tooltipTrigger.isBossHeader = item.isBossHeader
-            line.tooltipTrigger.tooltipRef = item.displayLink or item.tooltipRef
+            lh.tooltipTrigger.itemID = item.itemID
+            lh.tooltipTrigger.isBossHeader = item.isBossHeader
+            lh.tooltipTrigger.tooltipRef = item.displayLink or item.tooltipRef
 
-            if not line.tooltipTrigger.handlersSet then
-              line.tooltipTrigger.handlersSet = true
+            if not lh.handlersSet then
+              lh.handlersSet = true
 
-              line.tooltipTrigger:SetScript("OnEnter", function(self)
+              lh.tooltipTrigger:SetScript("OnEnter", function(self)
                 if InCombatLockdown() then return end
                 if self.isBossHeader then return end
                 if not self.itemID then return end
 
-                -- Position and show tooltip
-                trackerTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+                -- Position tooltip at mouse cursor using UIParent anchor
+                trackerTooltip:SetOwner(UIParent, "ANCHOR_CURSOR")
                 trackerTooltip:ClearAllPoints()
-                trackerTooltip:SetPoint("TOPRIGHT", line, "TOPLEFT", -4, 0)
 
                 -- Use the journal item link if available (contains difficulty info),
                 -- otherwise fall back to itemID
@@ -272,11 +282,11 @@ local function layoutContents(self)
                 trackerTooltip:Show()
               end)
 
-              line.tooltipTrigger:SetScript("OnLeave", function(self)
+              lh.tooltipTrigger:SetScript("OnLeave", function(self)
                 trackerTooltip:Hide()
               end)
 
-              line.tooltipTrigger:SetScript("OnMouseUp", function(self, button)
+              lh.tooltipTrigger:SetScript("OnMouseUp", function(self, button)
                 if button == "LeftButton" and IsShiftKeyDown() and self.itemID then
                   ns.RemoveTrackedItem(self.itemID)
                 end
