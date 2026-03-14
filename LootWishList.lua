@@ -360,7 +360,16 @@ function namespace.ShowLootDialog(playerName, itemLink)
       useLinkForItemInfo = true
     }
 
-    StaticPopup_Show("LOOT_WISHLIST_ALERT", message, nil, data)
+    -- Defer the popup using C_Timer to avoid taint from insecure context.
+    -- Calling StaticPopup_Show directly from chat event handlers can taint the popup.
+    if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
+      C_Timer.After(0, function()
+        StaticPopup_Show("LOOT_WISHLIST_ALERT", message, nil, data)
+      end)
+    else
+      -- Fallback for classic/era where C_Timer might not exist
+      StaticPopup_Show("LOOT_WISHLIST_ALERT", message, nil, data)
+    end
   end
 end
 

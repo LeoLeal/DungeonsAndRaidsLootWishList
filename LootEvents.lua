@@ -1,5 +1,56 @@
 local LootEvents = {}
 
+-- Deferred event queue for combat-safe processing
+local deferredQueue = {}
+local isProcessingQueue = false
+
+-- Process queued events when player leaves combat
+local function ProcessDeferredQueue()
+  if isProcessingQueue or #deferredQueue == 0 then
+    return
+  end
+
+  isProcessingQueue = true
+
+  while #deferredQueue > 0 do
+    local queued = table.remove(deferredQueue, 1)
+    if queued and queued.func then
+      queued.func(unpack(queued.args or {}))
+    end
+  end
+
+  isProcessingQueue = false
+end
+
+-- Register combat regen event if not already registered
+local function RegisterCombatHandler()
+  if not LootEvents.combatHandlerRegistered then
+    local frame = CreateFrame("Frame")
+    frame:RegisterEvent("PLAYER_REGEN_ENABLED")
+    frame:SetScript("OnEvent", function(self, event)
+      if event == "PLAYER_REGEN_ENABLED" then
+        ProcessDeferredQueue()
+      end
+    end)
+    LootEvents.combatHandlerRegistered = true
+  end
+end
+
+-- Queue a function for execution after combat
+local function DeferUntilOutOfCombat(func, ...)
+  if not InCombatLockdown() then
+    -- Not in combat, execute immediately
+    func(...)
+  else
+    -- In combat, queue for later
+    table.insert(deferredQueue, {
+      func = func,
+      args = {...}
+    })
+    RegisterCombatHandler()
+  end
+end
+
 local function findRollFrameById(rollID)
   local maxFrames = NUM_GROUP_LOOT_FRAMES or 4
   for index = 1, maxFrames do
@@ -70,6 +121,7 @@ local function getLootPatterns()
 end
 
 function LootEvents.HandleChatLoot(namespace, message, playerNameEvent)
+  -- Process immediately to avoid accessing tainted message later
   if type(message) ~= "string" then
     return
   end
@@ -108,18 +160,24 @@ function LootEvents.HandleChatLoot(namespace, message, playerNameEvent)
     return
   end
 
-  if player and itemLink then
-    namespace.ShowLootDialog(player, itemLink)
-  else
-    -- Fallback ideally should not happen if we parsed correctly
-    if type(StaticPopup_Show) == "function" then
-      local data = {
-        link = itemLink,
-        useLinkForItemInfo = true
-      }
-      StaticPopup_Show("LOOT_WISHLIST_ALERT", message, nil, data)
+  -- Show dialog - defer if in combat to avoid taint
+  local function ShowPopup()
+    if player and itemLink then
+      namespace.ShowLootDialog(player, itemLink)
+    else
+      -- Fallback ideally should not happen if we parsed correctly
+      if type(StaticPopup_Show) == "function" then
+        local data = {
+          link = itemLink,
+          useLinkForItemInfo = true
+        }
+        StaticPopup_Show("LOOT_WISHLIST_ALERT", message, nil, data)
+      end
     end
   end
+
+  -- Defer only the popup if in combat
+  DeferUntilOutOfCombat(ShowPopup)
 end
 
 local _, namespace = ...
