@@ -1,16 +1,10 @@
 local AdventureGuideUI = {}
 
-local function isEncounterJournalDescendant(frame)
-  while frame do
-    if frame == EncounterJournal then
-      return true
-    end
-
-    frame = frame:GetParent()
-  end
-
-  return false
-end
+local checkboxByButton = setmetatable({}, { __mode = "k" })
+local buttonByCheckbox = setmetatable({}, { __mode = "k" })
+local itemDataByButton = setmetatable({}, { __mode = "k" })
+local checkboxOverlay = nil
+local getLootScrollBox
 
 local function frameOrAncestorNameMatches(frame, patterns)
   while frame do
@@ -152,27 +146,103 @@ local function isLikelyLootButton(frame)
 end
 
 local function ensureCheckbox(namespace, lootButton)
-  local checkbox = lootButton.LootWishListCheckbox
+  local checkbox = checkboxByButton[lootButton]
   if checkbox then
     return checkbox
   end
 
-  checkbox = CreateFrame("CheckButton", nil, lootButton, "UICheckButtonTemplate")
+  local checkboxParent = checkboxOverlay or getLootScrollBox() or EncounterJournal or UIParent
+  checkbox = CreateFrame("CheckButton", nil, checkboxParent, "UICheckButtonTemplate")
   checkbox:SetSize(24, 24)
+  checkbox:SetFrameStrata("DIALOG")
   checkbox:HookScript("OnClick", function(self)
-    if self.isUpdating or not self.itemData then
+    local ownerButton = buttonByCheckbox[self]
+    local itemData = ownerButton and itemDataByButton[ownerButton] or nil
+    if self.isUpdating or not itemData then
       return
     end
 
-    namespace.SetTrackedFromItemData(self.itemData, self:GetChecked())
+    namespace.SetTrackedFromItemData(itemData, self:GetChecked())
   end)
 
-  lootButton.LootWishListCheckbox = checkbox
+  checkboxByButton[lootButton] = checkbox
+  buttonByCheckbox[checkbox] = lootButton
   return checkbox
 end
 
+function getLootScrollBox()
+  return EncounterJournal and EncounterJournal.encounter and EncounterJournal.encounter.info and
+      EncounterJournal.encounter.info.LootContainer and EncounterJournal.encounter.info.LootContainer.ScrollBox or nil
+end
+
+local function ensureCheckboxOverlay()
+  local scrollBox = getLootScrollBox()
+  if not scrollBox then
+    return nil
+  end
+
+  if checkboxOverlay and checkboxOverlay:GetParent() ~= scrollBox then
+    checkboxOverlay:Hide()
+    checkboxOverlay:SetParent(scrollBox)
+    checkboxOverlay:ClearAllPoints()
+    checkboxOverlay:SetAllPoints(scrollBox)
+  end
+
+  if not checkboxOverlay then
+    checkboxOverlay = CreateFrame("Frame", nil, scrollBox)
+    checkboxOverlay:SetAllPoints(scrollBox)
+    checkboxOverlay:EnableMouse(false)
+  end
+
+  checkboxOverlay:SetFrameStrata(scrollBox:GetFrameStrata())
+  checkboxOverlay:SetFrameLevel((scrollBox:GetFrameLevel() or 0) + 20)
+  checkboxOverlay:Show()
+  return checkboxOverlay
+end
+
+local function visitLootDescendants(frame, callback, visited)
+  if not frame or visited[frame] then
+    return
+  end
+
+  visited[frame] = true
+
+  if frame ~= getLootScrollBox() and frame.GetObjectType and frame:GetObjectType() == "Button" and frame:IsShown() and isLikelyLootButton(frame) then
+    callback(frame)
+  end
+
+  if frame.GetChildren then
+    for _, child in ipairs({ frame:GetChildren() }) do
+      visitLootDescendants(child, callback, visited)
+    end
+  end
+end
+
+local function forEachVisibleLootButton(callback)
+  local scrollBox = getLootScrollBox()
+  if not scrollBox or not scrollBox:IsShown() then
+    return
+  end
+
+  if type(scrollBox.ForEachFrame) == "function" then
+    scrollBox:ForEachFrame(function(frame)
+      if frame and frame:IsShown() and frame.GetObjectType and frame:GetObjectType() == "Button" and isLikelyLootButton(frame) then
+        callback(frame)
+      end
+    end)
+    return
+  end
+
+  visitLootDescendants(scrollBox, callback, {})
+end
+
 local function positionCheckbox(lootButton, checkbox)
+  local overlayParent = ensureCheckboxOverlay()
   checkbox:ClearAllPoints()
+  checkbox:SetParent(overlayParent or EncounterJournal or UIParent)
+  if lootButton and lootButton.GetFrameLevel then
+    checkbox:SetFrameLevel((lootButton:GetFrameLevel() or 0) + 30)
+  end
 
   local textRegion = getPrimaryTextRegion(lootButton)
   if textRegion then
@@ -194,32 +264,39 @@ function AdventureGuideUI.Refresh(namespace)
       EncounterJournal_IsRaidTabSelected(EncounterJournal)
   local shouldShowCheckboxes = isDungeonTab or isRaidTab
 
-  local frame = nil
-  while true do
-    frame = EnumerateFrames(frame)
-    if not frame then
-      break
+  local seenButtons = {}
+
+  forEachVisibleLootButton(function(frame)
+    seenButtons[frame] = true
+
+    local checkbox = checkboxByButton[frame]
+    if checkbox and not shouldShowCheckboxes then
+      checkbox:Hide()
+      itemDataByButton[frame] = nil
+      return
     end
 
-    if frame:IsShown() and frame:GetObjectType() == "Button" and isEncounterJournalDescendant(frame) then
-      -- Hide our checkboxes if not on dungeon/raid tabs
-      local checkbox = frame.LootWishListCheckbox
-      if checkbox and not shouldShowCheckboxes then
+    if shouldShowCheckboxes then
+      local itemData = buildItemData(namespace, frame)
+      if itemData then
+        checkbox = ensureCheckbox(namespace, frame)
+        positionCheckbox(frame, checkbox)
+        itemDataByButton[frame] = itemData
+        checkbox.isUpdating = true
+        checkbox:SetChecked(namespace.IsTrackedItem(itemData.itemID))
+        checkbox.isUpdating = false
+        checkbox:Show()
+      elseif checkbox then
         checkbox:Hide()
+        itemDataByButton[frame] = nil
       end
+    end
+  end)
 
-      if shouldShowCheckboxes and isLikelyLootButton(frame) then
-        local itemData = buildItemData(namespace, frame)
-        if itemData then
-          checkbox = ensureCheckbox(namespace, frame)
-          positionCheckbox(frame, checkbox)
-          checkbox.itemData = itemData
-          checkbox.isUpdating = true
-          checkbox:SetChecked(namespace.IsTrackedItem(itemData.itemID))
-          checkbox.isUpdating = false
-          checkbox:Show()
-        end
-      end
+  for button, checkbox in pairs(checkboxByButton) do
+    if checkbox and (not shouldShowCheckboxes or not seenButtons[button]) then
+      checkbox:Hide()
+      itemDataByButton[button] = nil
     end
   end
 end

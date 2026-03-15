@@ -1,10 +1,4 @@
-# Loot Alert Dialog
-
-## Purpose
-
-TBD: Manage the formatting and presentation of the custom loot alert dialog for wishlisted items.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Loot Alert Dialog Configuration
 

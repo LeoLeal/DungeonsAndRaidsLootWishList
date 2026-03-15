@@ -4,6 +4,7 @@ namespace.db = namespace.db or {}
 namespace.state = namespace.state or {
   possessed = {},
   bankKnown = false,
+  pendingLootAlerts = {},
 }
 
 local eventFrame = CreateFrame("Frame")
@@ -73,6 +74,10 @@ local debouncedRefresh = createDebouncedRefresh(0.25)
 local function getCurrentDb()
   LootWishListDB = LootWishListDB or { characters = {} }
   return LootWishListDB
+end
+
+local function getTrackedItemEntry(itemID)
+  return namespace.WishlistStore.getExistingItemEntry(getCurrentDb(), getCharacterKey(), itemID)
 end
 
 local function getItemLevel(itemLink)
@@ -191,6 +196,9 @@ function namespace.SetTrackedFromItemData(itemData, tracked)
       encounterID = normalized.encounterID,
       instanceID = normalized.instanceID,
     })
+    if normalized.instanceID then
+      namespace.PrimeEncounterDataForInstance(normalized.instanceID)
+    end
   else
     namespace.WishlistStore.removeItem(db, characterKey, normalized.itemID)
   end
@@ -275,21 +283,50 @@ local function isRaidInstance(instanceID)
 end
 
 local instanceEncounterRanks = {}
-local function getEncounterRank(encounterID, instanceID)
-  if not encounterID or not instanceID then return 999 end
-  if not instanceEncounterRanks[instanceID] then
-    instanceEncounterRanks[instanceID] = {}
-    if type(EJ_SelectInstance) == "function" and type(EJ_GetEncounterInfoByIndex) == "function" then
-      EJ_SelectInstance(instanceID)
-      local e = 1
-      while true do
-        local _, _, eid = EJ_GetEncounterInfoByIndex(e)
-        if not eid then break end
-        instanceEncounterRanks[instanceID][eid] = e
-        e = e + 1
-      end
+local function primeEncounterDataForInstance(instanceID)
+  if not instanceID or instanceEncounterRanks[instanceID] then
+    return
+  end
+
+  instanceEncounterRanks[instanceID] = {}
+
+  if type(EJ_SelectInstance) ~= "function" or type(EJ_GetEncounterInfoByIndex) ~= "function" then
+    return
+  end
+
+  EJ_SelectInstance(instanceID)
+  local e = 1
+  while true do
+    local _, _, encounterID = EJ_GetEncounterInfoByIndex(e)
+    if not encounterID then
+      break
+    end
+
+    instanceEncounterRanks[instanceID][encounterID] = e
+    e = e + 1
+  end
+end
+
+function namespace.PrimeEncounterDataForInstance(instanceID)
+  primeEncounterDataForInstance(instanceID)
+end
+
+local function primeTrackedEncounterData()
+  local trackedItems = namespace.WishlistStore.getTrackedItems(getCurrentDb(), getCharacterKey())
+  local primed = {}
+
+  for _, item in ipairs(trackedItems) do
+    local instanceID = item.instanceID
+    if isRaidInstance(instanceID) and not primed[instanceID] then
+      primed[instanceID] = true
+      primeEncounterDataForInstance(instanceID)
     end
   end
+end
+
+local function getEncounterRank(encounterID, instanceID)
+  if not encounterID or not instanceID then return 999 end
+  if not instanceEncounterRanks[instanceID] then return 999 end
   return instanceEncounterRanks[instanceID][encounterID] or 999
 end
 
@@ -344,33 +381,113 @@ function namespace.BuildTrackerGroups()
   return namespace.TrackerModel.buildGroups(renderItems, namespace.GetText("OTHER"))
 end
 
-function namespace.ShowLootDialog(playerName, itemLink)
-  if type(StaticPopup_Show) == "function" then
-    -- Format message text: white body, orange player name with padding newlines
-    -- \194\160 is the UTF-8 non-breaking space, which prevents WoW from trimming/collapsing the spaces
-    local message = string.format(
-      "|n\194\160\194\160" ..
-      (namespace.GetText("PLAYER_LOOTED_WISHLIST_ITEM") or "|cFFFFFFFF%s|r looted an item on your Loot Wishlist!") ..
-      "\194\160\194\160|n|n",
-      "|cffffcc00" .. playerName .. "|cFFFFFFFF"
-    )
+local function buildAlertItemLink(record)
+  if record.itemLink and type(record.itemLink) == "string" and record.itemLink:find("item:") then
+    return record.itemLink
+  end
 
-    local data = {
-      link = itemLink,
-      useLinkForItemInfo = true
-    }
-
-    -- Defer the popup using C_Timer to avoid taint from insecure context.
-    -- Calling StaticPopup_Show directly from chat event handlers can taint the popup.
-    if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
-      C_Timer.After(0, function()
-        StaticPopup_Show("LOOT_WISHLIST_ALERT", message, nil, data)
-      end)
-    else
-      -- Fallback for classic/era where C_Timer might not exist
-      StaticPopup_Show("LOOT_WISHLIST_ALERT", message, nil, data)
+  if record.itemID and type(GetItemInfo) == "function" then
+    local itemLink = select(2, GetItemInfo(record.itemID))
+    if itemLink then
+      return itemLink
     end
   end
+
+  if record.itemID then
+    local itemName = record.itemName or ("Item " .. tostring(record.itemID))
+    return string.format("|Hitem:%d::::::::::::|h[%s]|h", record.itemID, itemName)
+  end
+
+  return nil
+end
+
+function namespace.BuildLootAlertRecord(itemID, playerName)
+  if type(itemID) ~= "number" or type(playerName) ~= "string" or playerName == "" then
+    return nil
+  end
+
+  local entry = getTrackedItemEntry(itemID)
+  if not entry or entry.tracked ~= true then
+    return nil
+  end
+
+  return {
+    itemID = itemID,
+    itemName = entry.itemName,
+    itemLink = entry.itemLink,
+    playerName = playerName,
+    tracked = true,
+  }
+end
+
+function namespace.ShowLootDialogFromRecord(record)
+  if type(StaticPopup_Show) ~= "function" or type(record) ~= "table" then
+    return
+  end
+
+  local playerName = record.playerName
+  local itemLink = buildAlertItemLink(record)
+  if type(playerName) ~= "string" or playerName == "" or not itemLink then
+    return
+  end
+
+  local message = string.format(
+    "|n\194\160\194\160" ..
+    (namespace.GetText("PLAYER_LOOTED_WISHLIST_ITEM") or "|cFFFFFFFF%s|r looted an item on your Loot Wishlist!") ..
+    "\194\160\194\160|n|n",
+    "|cffffcc00" .. playerName .. "|cFFFFFFFF"
+  )
+
+  local data = {
+    link = itemLink,
+    useLinkForItemInfo = true,
+  }
+
+  if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
+    C_Timer.After(0, function()
+      StaticPopup_Show("LOOT_WISHLIST_ALERT", message, nil, data)
+    end)
+  else
+    StaticPopup_Show("LOOT_WISHLIST_ALERT", message, nil, data)
+  end
+end
+
+function namespace.ShowLootDialog(playerName, itemLink)
+  local itemID = namespace.ItemResolver.getItemIdFromLink(itemLink)
+  namespace.ShowLootDialogFromRecord({
+    itemID = itemID,
+    itemLink = itemLink,
+    playerName = playerName,
+  })
+end
+
+function namespace.FlushLootAlerts()
+  local pendingLootAlerts = namespace.state.pendingLootAlerts or {}
+  namespace.state.pendingLootAlerts = {}
+  namespace.state.lootAlertFlushQueued = false
+
+  for _, alertRecord in ipairs(pendingLootAlerts) do
+    namespace.ShowLootDialogFromRecord(alertRecord)
+  end
+end
+
+function namespace.QueueLootAlert(alertRecord)
+  if type(alertRecord) ~= "table" then
+    return
+  end
+
+  local pendingLootAlerts = namespace.state.pendingLootAlerts or {}
+  namespace.state.pendingLootAlerts = pendingLootAlerts
+  table.insert(pendingLootAlerts, alertRecord)
+
+  if namespace.state.lootAlertFlushQueued then
+    return
+  end
+
+  namespace.state.lootAlertFlushQueued = true
+  QueueAfterCombat(function()
+    namespace.FlushLootAlerts()
+  end)
 end
 
 function namespace.RefreshTracker()
@@ -411,6 +528,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "PLAYER_LOGIN" then
     namespace.db = getCurrentDb()
     namespace.WishlistStore.runMigration(namespace.db, namespace)
+    primeTrackedEncounterData()
     namespace.TrackerUI.Initialize(namespace)
     namespace.AdventureGuideUI.Initialize(namespace)
     registerEvents()

@@ -1,8 +1,4 @@
-## Purpose
-
-Define how tracked wishlist items are rendered in the Objective Tracker, including grouping, row presentation, and removal interactions.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Objective tracker shows a Loot Wishlist section
 
@@ -11,12 +7,12 @@ The addon SHALL display a `Loot Wishlist` section in the objective-tracker area 
 #### Scenario: Tracker section appears when items are tracked
 
 - **WHEN** the active character has one or more tracked wishlist items
-- **THEN** the objective tracker shows a `Loot Wishlist` section containing those items
+- **THEN** the objective-tracker area shows a `Loot Wishlist` section containing those items
 
 #### Scenario: Tracker section disappears when no items are tracked
 
 - **WHEN** the active character has no tracked wishlist items
-- **THEN** the objective tracker does not show the `Loot Wishlist` section
+- **THEN** the `Loot Wishlist` section does not appear in the objective-tracker area
 
 #### Scenario: Wishlist section remains visible with no other objectives
 
@@ -46,20 +42,6 @@ When native Objective Tracker content is visible, the addon SHALL position the `
 
 - **WHEN** the player collapses all objectives through the native Objective Tracker collapse control while the wishlist is visible
 - **THEN** the `Loot Wishlist` section is hidden as part of that collapsed tracker presentation
-
-### Requirement: Tracker items are grouped by loot source
-
-The addon SHALL group tracked items in the objective tracker by their identified loot source, such as the dungeon or raid where the item drops. If no loot source can be identified for a tracked item, the addon SHALL place that item under an `Other` group.
-
-#### Scenario: Item with identified source is grouped under that source
-
-- **WHEN** a tracked item has a known dungeon or raid source
-- **THEN** the objective tracker displays that item under a group named for that source
-
-#### Scenario: Item with unknown source falls back to Other
-
-- **WHEN** a tracked item does not have an identified loot source
-- **THEN** the objective tracker displays that item under the `Other` group
 
 ### Requirement: Source group headers open Adventure Guide loot view when clicked
 
@@ -128,85 +110,9 @@ The addon SHALL show a green tick for a tracked item only when the active charac
 #### Scenario: Tracked items from a raid are grouped by boss
 
 - **WHEN** the addon resolves tracked items' source as a raid and successfully determines encounter boss names
-- **THEN** the objective tracker displays a gray section header for each boss followed by items belonging to that boss, sorted by encounter order (e.g., Boss A header → items from Boss A, Boss B header → items from Boss B)
+- **THEN** the objective tracker displays a gray section header for each boss followed by items belonging to that boss, sorted by encounter order (e.g., Boss A header -> items from Boss A, Boss B header -> items from Boss B)
 
 #### Scenario: Tracked item from a dungeon does not show boss header
 
 - **WHEN** the addon resolves a tracked item's source as a dungeon (not a raid)
-- **THEN** the objective tracker displays items in a flat list without boss headers, showing only the item name and item level.
-
-### Requirement: Tracker rows support direct removal
-
-The addon SHALL allow the user to remove a tracked item from the wishlist by Shift-clicking that item in the objective tracker.
-
-#### Scenario: Shift-click removes a tracked item
-
-- **WHEN** the user Shift-clicks a tracked item in the `Loot Wishlist` section
-- **THEN** the addon removes the item from the active character's wishlist and updates the tracker accordingly
-
-### Requirement: Newly added tracker items use native tracker animation
-
-When an item is newly added to the `Loot Wishlist` section, the addon SHALL reuse the same style of add-entry animation used by the native objective tracker when a new quest is tracked.
-
-#### Scenario: Newly tracked item appears in the tracker
-
-- **WHEN** the user adds an item to the wishlist and it appears in the objective tracker for the first time
-- **THEN** the item entry uses the native objective-tracker add animation style rather than a custom animation
-
-### Requirement: Tracker visuals prefer native Blizzard UI assets
-
-The addon SHALL prefer Blizzard-provided UI assets and visual patterns for tracker presentation, including indicators and row styling, unless a native asset cannot express the required behavior.
-
-#### Scenario: Tracker row is rendered
-
-- **WHEN** the addon renders a wishlist row in the objective tracker
-- **THEN** it uses native Blizzard visual patterns where practical instead of bespoke addon-specific visuals
-
-### Requirement: Source groups are collapsible
-
-The wishlist tracker SHALL allow each source group (dungeon, raid, Other) to be collapsed or expanded independently.
-
-#### Scenario: Collapse a group
-
-- **WHEN** the user clicks the collapse button on a source group header
-- **THEN** the group's items are hidden from view
-- **AND** the collapse button changes to expand button (showing +)
-- **AND** the group header displays the item count in parentheses
-
-#### Scenario: Expand a group
-
-- **WHEN** the user clicks the expand button on a collapsed source group header
-- **THEN** the group's items are displayed
-- **AND** the expand button changes to collapse button (showing −)
-- **AND** the group header displays just the group name without item count
-
-#### Scenario: Collapse state persists across sessions
-
-- **WHEN** the user collapses a group and relogs or reloads the UI
-- **THEN** the group remains collapsed in the same state
-
-### Requirement: Item count displays for collapsed groups
-
-When a source group is collapsed, the group header SHALL display the number of items in that group.
-
-#### Scenario: Collapsed group shows count
-
-- **GIVEN** a source group with 3 tracked items is collapsed
-- **WHEN** the group is rendered
-- **THEN** the header displays as "Group Name (3)"
-
-### Requirement: Collapse button uses native visual style
-
-The collapse/expand buttons SHALL match the visual style of native WoW Objective Tracker buttons.
-
-#### Scenario: Button uses native atlases
-
-- **WHEN** the collapse button is rendered
-- **THEN** it uses atlas "ui-questtrackerbutton-secondary-collapse" for normal state
-- **AND** uses atlas "ui-questtrackerbutton-secondary-collapse-pressed" for pushed state
-
-#### Scenario: Button is positioned at right edge of header
-
-- **WHEN** the collapse/expand button is created
-- **THEN** it is anchored to the right edge of the block header
-- **AND** the group title text is positioned to the left of the button
+- **THEN** the objective tracker displays items in a flat list without boss headers, showing only the item name and item level
