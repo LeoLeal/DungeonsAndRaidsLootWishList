@@ -56,10 +56,10 @@ local translations = {
     PLAYER_LOOTED_WISHLIST_ITEM = "%s saqueou um item da sua Lista de Desejos!",
   },
   ruRU = {
-    LOOT_WISHLIST = "spisok dobychi",
-    WISHLIST = "spisok zhelaniy",
-    OTHER = "drugoe",
-    PLAYER_LOOTED_WISHLIST_ITEM = "%s poluchil predmet iz vashego spiska zhelaniy!",
+    LOOT_WISHLIST = "Список желаемой добычи",
+    WISHLIST = "Список желаний",
+    OTHER = "Другое",
+    PLAYER_LOOTED_WISHLIST_ITEM = "%s получил(а) предмет из Вашего списка желаний!",
   },
   zhCN = {
     LOOT_WISHLIST = "战利品心愿单",
