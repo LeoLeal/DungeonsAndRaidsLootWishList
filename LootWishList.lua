@@ -515,8 +515,8 @@ function namespace.BuildTrackerGroups()
   })
 end
 
-function namespace.BuildLootAlertRecord(itemID, playerName)
-  if type(itemID) ~= "number" or type(playerName) ~= "string" then
+function namespace.BuildLootAlertRecord(itemID, playerName, itemLink)
+  if type(itemID) ~= "number" or type(playerName) ~= "string" or type(itemLink) ~= "string" or itemLink == "" then
     return nil
   end
 
@@ -528,9 +528,8 @@ function namespace.BuildLootAlertRecord(itemID, playerName)
   return {
     itemID = itemID,
     itemName = entry.itemName,
-    itemLink = entry.itemLink,
+    itemLink = itemLink,
     playerName = playerName,
-    tracked = true,
   }
 end
 
@@ -856,4 +855,5 @@ SlashCmdList["LWTESTALERT"] = function()
   namespace.ShowLootDialog(randomName, itemLink)
   print("LootWishList: Triggered test alert for " .. randomName .. " looting " .. itemLink)
 end
+
 --@end-do-not-package@

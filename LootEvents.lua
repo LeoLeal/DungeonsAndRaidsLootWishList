@@ -161,13 +161,16 @@ function LootEvents.HandleChatLoot(namespace, message, playerNameEvent)
     return
   end
 
-  local itemLink = extractItemLinkFromLootMessage(message)
-
-  if not itemLink then
+  if not isReadableLootValue(message) then
     return
   end
 
-  local itemID = namespace.ItemResolver.getItemIdFromLink(itemLink)
+  local itemLink = extractItemLinkFromLootMessage(message)
+
+  local itemID = nil
+  if itemLink then
+    itemID = namespace.ItemResolver.getItemIdFromLink(itemLink)
+  end
   if not itemID or not namespace.IsTrackedItem(itemID) then
     return
   end
@@ -176,7 +179,7 @@ function LootEvents.HandleChatLoot(namespace, message, playerNameEvent)
     return
   end
 
-  local alertRecord = namespace.BuildLootAlertRecord(itemID, playerNameEvent)
+  local alertRecord = namespace.BuildLootAlertRecord(itemID, playerNameEvent, itemLink)
   if alertRecord then
     namespace.QueueLootAlert(alertRecord)
   end

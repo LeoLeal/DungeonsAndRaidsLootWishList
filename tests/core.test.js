@@ -602,8 +602,8 @@ test('loot events queue a normalized alert record for tracked chat loot outside 
         WasRecentSelfLoot = function(itemID)
           return false
         end,
-        BuildLootAlertRecord = function(itemID, playerName)
-          return { itemID = itemID, playerName = playerName }
+        BuildLootAlertRecord = function(itemID, playerName, itemLink)
+          return { itemID = itemID, playerName = playerName, itemLink = itemLink }
         end,
         QueueLootAlert = function(record)
           queued = record
@@ -615,11 +615,13 @@ test('loot events queue a normalized alert record for tracked chat loot outside 
       return {
         itemID = queued and queued.itemID,
         playerName = queued and queued.playerName,
+        itemLink = queued and queued.itemLink,
       }
     `)
 
     assert.equal(result.itemID, 19019)
     assert.equal(result.playerName, 'Teammate')
+    assert.equal(result.itemLink, '|Hitem:19019::::::::70:::::|h[Thunderfury]|h')
   } finally {
     lua.global.close()
   }
@@ -629,6 +631,10 @@ test('loot events skip inaccessible chat payloads before parsing or queueing', a
   const factory = new LuaFactory()
   const lua = await factory.createEngine()
   const source = fs.readFileSync(path.join(process.cwd(), 'LootEvents.lua'), 'utf8')
+    .replace(
+      'local function extractItemLinkFromLootMessage(message)\n',
+      'local extractCalls = 0\nlocal function extractItemLinkFromLootMessage(message)\n  extractCalls = extractCalls + 1\n'
+    )
     .replace(/local _, namespace = \.\.\.[\s\S]*$/, '')
 
   try {
@@ -656,8 +662,8 @@ test('loot events skip inaccessible chat payloads before parsing or queueing', a
         WasRecentSelfLoot = function(itemID)
           return false
         end,
-        BuildLootAlertRecord = function(itemID, playerName)
-          return { itemID = itemID, playerName = playerName }
+        BuildLootAlertRecord = function(itemID, playerName, itemLink)
+          return { itemID = itemID, playerName = playerName, itemLink = itemLink }
         end,
         QueueLootAlert = function(record)
           queueCount = queueCount + 1
@@ -666,10 +672,14 @@ test('loot events skip inaccessible chat payloads before parsing or queueing', a
 
       LootEvents.HandleChatLoot(namespace, "blocked-payload", "Teammate")
 
-      return queueCount
+      return {
+        queueCount = queueCount,
+        extractCalls = extractCalls,
+      }
     `)
 
-    assert.equal(result, 0)
+    assert.equal(result.queueCount, 0)
+    assert.equal(result.extractCalls, 0)
   } finally {
     lua.global.close()
   }
@@ -707,8 +717,8 @@ test('loot events still queue a normalized alert record during combat', async ()
         WasRecentSelfLoot = function(itemID)
           return false
         end,
-        BuildLootAlertRecord = function(itemID, playerName)
-          return { itemID = itemID, playerName = playerName }
+        BuildLootAlertRecord = function(itemID, playerName, itemLink)
+          return { itemID = itemID, playerName = playerName, itemLink = itemLink }
         end,
         QueueLootAlert = function(record)
           queued = record
@@ -720,11 +730,13 @@ test('loot events still queue a normalized alert record during combat', async ()
       return {
         itemID = queued and queued.itemID,
         playerName = queued and queued.playerName,
+        itemLink = queued and queued.itemLink,
       }
     `)
 
     assert.equal(result.itemID, 19019)
     assert.equal(result.playerName, 'Teammate')
+    assert.equal(result.itemLink, '|Hitem:19019::::::::70:::::|h[Thunderfury]|h')
   } finally {
     lua.global.close()
   }
@@ -826,6 +838,65 @@ test('recent self-loot helper expires old markers', async () => {
 
     assert.equal(result.before, true)
     assert.equal(result.after, false)
+  } finally {
+    lua.global.close()
+  }
+})
+
+test('build loot alert record requires the caller-provided item link', async () => {
+  const factory = new LuaFactory()
+  const lua = await factory.createEngine()
+  const source = fs.readFileSync(path.join(process.cwd(), 'LootWishList.lua'), 'utf8')
+    .replace(/--@do-not-package@[\s\S]*--@end-do-not-package@\s*$/, '')
+
+  try {
+    const result = await lua.doString(`
+      local function newFrame()
+        local frame = {}
+        function frame:RegisterEvent() end
+        function frame:SetScript() end
+        return frame
+      end
+
+      function CreateFrame()
+        return newFrame()
+      end
+
+      local namespace = {
+        db = {},
+        state = {},
+        WishlistStore = {
+          getExistingItemEntry = function(_, _, itemID)
+            if itemID == 19019 then
+              return {
+                tracked = true,
+                itemName = 'Thunderfury',
+                itemLink = '|Hitem:19019::::::::70:::::|h[Saved Thunderfury]|h',
+              }
+            end
+            return nil
+          end,
+        },
+      }
+
+      function UnitName() return 'Player' end
+      function GetRealmName() return 'Realm' end
+
+      (function(...)
+        ${source}
+      end)('Addon', namespace)
+
+      local withLink = namespace.BuildLootAlertRecord(19019, 'Teammate', '|Hitem:19019::::::::70:::::|h[Looted Thunderfury]|h')
+      local withoutLink = namespace.BuildLootAlertRecord(19019, 'Teammate')
+
+      return {
+        withLink = withLink and withLink.itemLink or nil,
+        withoutLink = withoutLink,
+      }
+    `)
+
+    assert.equal(result.withLink, '|Hitem:19019::::::::70:::::|h[Looted Thunderfury]|h')
+    assert.equal(result.withoutLink, undefined)
   } finally {
     lua.global.close()
   }

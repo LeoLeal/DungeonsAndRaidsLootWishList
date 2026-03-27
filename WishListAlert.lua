@@ -21,7 +21,7 @@ local function playAlertSound(soundKit)
 end
 
 local function buildAlertItemLink(record)
-  if record.itemLink and type(record.itemLink) == "string" and record.itemLink:find("item:") then
+  if type(record.itemLink) == "string" and record.itemLink:find("item:") then
     return record.itemLink
   end
 
@@ -41,8 +41,13 @@ local function buildAlertItemLink(record)
 end
 
 local function getAlertItemIcon(record)
+  local itemLink = buildAlertItemLink(record)
   if type(GetItemIcon) ~= "function" then
     return nil
+  end
+
+  if itemLink then
+    return GetItemIcon(itemLink)
   end
 
   if record.itemID then
@@ -53,9 +58,9 @@ local function getAlertItemIcon(record)
 end
 
 local function getAlertItemDisplayName(record, itemLink)
-  local itemName = record.itemName
+  local itemName = itemLink
   if type(itemName) ~= "string" or itemName == "" then
-    itemName = itemLink
+    itemName = record.itemName
   end
 
   if type(itemName) ~= "string" then
