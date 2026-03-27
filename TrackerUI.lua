@@ -8,6 +8,7 @@ local knownRowKeys = {}
 local knownItemStates = {}
 local ns = nil
 local syncTrackerFrame = nil
+local hoveredTrackerRow = nil
 
 local COLLAPSE_ATLAS = "ui-questtrackerbutton-secondary-collapse"
 local EXPAND_ATLAS = "ui-questtrackerbutton-secondary-expand"
@@ -367,7 +368,7 @@ local function getGroupingButtonText()
 end
 
 local function showTrackerTooltip(row)
-  if not row or row.isBossHeader then
+  if not row or row.isBossHeader or (type(row.IsShown) == "function" and not row:IsShown()) then
     return
   end
 
@@ -410,6 +411,97 @@ local function hideTrackerTooltip()
   else
     trackerTooltip:Hide()
   end
+end
+
+local function clearHoveredTrackerRow()
+  hoveredTrackerRow = nil
+end
+
+local function setHoveredTrackerRow(row)
+  hoveredTrackerRow = row
+end
+
+local function isValidHoveredItemRow(row)
+  if not row or row.isBossHeader then
+    return false
+  end
+
+  if type(row.IsShown) == "function" and not row:IsShown() then
+    return false
+  end
+
+  return type(row.tooltipRef) == "string" or type(row.itemID) == "number"
+end
+
+local function isCursorOverFrame(frame)
+  if not frame or type(frame.IsShown) ~= "function" or not frame:IsShown() then
+    return false
+  end
+
+  if type(GetCursorPosition) ~= "function" then
+    return false
+  end
+
+  local left = frame.GetLeft and frame:GetLeft() or nil
+  local right = frame.GetRight and frame:GetRight() or nil
+  local top = frame.GetTop and frame:GetTop() or nil
+  local bottom = frame.GetBottom and frame:GetBottom() or nil
+  if not left or not right or not top or not bottom then
+    return false
+  end
+
+  local scale = UIParent and UIParent.GetEffectiveScale and UIParent:GetEffectiveScale() or 1
+  local cursorX, cursorY = GetCursorPosition()
+  cursorX = cursorX / scale
+  cursorY = cursorY / scale
+
+  return cursorX >= left and cursorX <= right and cursorY >= bottom and cursorY <= top
+end
+
+local function getLiveHoveredTrackerRow()
+  if type(GetMouseFocus) ~= "function" or not trackerFrame or not trackerFrame.rows then
+    if not trackerFrame or not trackerFrame.rows then
+      return nil
+    end
+  end
+
+  local focus = type(GetMouseFocus) == "function" and GetMouseFocus() or nil
+
+  if hoveredTrackerRow and isValidHoveredItemRow(hoveredTrackerRow) then
+    if focus and isDescendantOf(focus, hoveredTrackerRow) then
+      return hoveredTrackerRow
+    end
+
+    if isCursorOverFrame(hoveredTrackerRow) then
+      return hoveredTrackerRow
+    end
+  end
+
+  for _, row in ipairs(trackerFrame.rows) do
+    if isValidHoveredItemRow(row) then
+      if focus and isDescendantOf(focus, row) then
+        return row
+      end
+
+      if isCursorOverFrame(row) then
+        return row
+      end
+    end
+  end
+
+  return nil
+end
+
+local function reconcileTrackerTooltip()
+  local liveRow = getLiveHoveredTrackerRow()
+  if not isValidHoveredItemRow(liveRow) then
+    clearHoveredTrackerRow()
+    hideTrackerTooltip()
+    return
+  end
+
+  setHoveredTrackerRow(liveRow)
+  showTrackerTooltip(liveRow)
 end
 
 local function ensureTrackerContextMenu()
@@ -547,6 +639,7 @@ local function showTrackerContextMenu(row)
   end
 
   hideTrackerTooltip()
+  clearHoveredTrackerRow()
   closeTrackerContextMenu()
   menu.activeOwner = row
   menu.activeItemID = itemID
@@ -746,9 +839,11 @@ local function renderItemRow(row, item)
     row.tooltipRef = item.displayLink or item.tooltipRef
     row.tooltipFooter = item.tooltipFooter
     row:SetScript("OnEnter", function(self)
+      setHoveredTrackerRow(self)
       showTrackerTooltip(self)
     end)
     row:SetScript("OnLeave", function()
+      clearHoveredTrackerRow()
       hideTrackerTooltip()
     end)
     row:SetScript("OnClick", function(self, button)
@@ -775,15 +870,18 @@ syncTrackerFrame = function()
     return
   end
 
-  hideTrackerTooltip()
   closeTrackerContextMenu()
 
   if not currentGroups or #currentGroups == 0 then
+    clearHoveredTrackerRow()
+    hideTrackerTooltip()
     frame:Hide()
     return
   end
 
   if isTrackerExplicitlyCollapsed() then
+    clearHoveredTrackerRow()
+    hideTrackerTooltip()
     frame:Hide()
     return
   end
@@ -828,6 +926,8 @@ syncTrackerFrame = function()
   applyStandaloneHeaderButtonState(frame)
 
   if showStandaloneHeader and frame.lootWishlistStandaloneHidden then
+    clearHoveredTrackerRow()
+    hideTrackerTooltip()
     frame.headerFrame:Hide()
     if frame.contentFrame then
       frame.contentFrame:Hide()
@@ -846,6 +946,8 @@ syncTrackerFrame = function()
   end
 
   if frame.lootWishlistCollapsed then
+    clearHoveredTrackerRow()
+    hideTrackerTooltip()
     if frame.contentFrame then
       frame.contentFrame:Hide()
       frame.contentFrame:SetHeight(0)
@@ -941,6 +1043,8 @@ syncTrackerFrame = function()
   if addedNewItem then
     playAddAnimation(frame)
   end
+
+  reconcileTrackerTooltip()
 end
 
 local function hookTrackerState()

@@ -856,4 +856,9 @@ SlashCmdList["LWTESTALERT"] = function()
   print("LootWishList: Triggered test alert for " .. randomName .. " looting " .. itemLink)
 end
 
+SLASH_LWTESTREFRESH1 = "/testrefresh"
+SlashCmdList["LWTESTREFRESH"] = function()
+  namespace.RefreshAll()
+  print("LootWishList: Triggered RefreshAll()")
+end
 --@end-do-not-package@
