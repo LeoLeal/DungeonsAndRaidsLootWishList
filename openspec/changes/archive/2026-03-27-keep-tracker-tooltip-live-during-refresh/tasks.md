@@ -12,4 +12,4 @@
 ## 3. Verify resilient hover behavior
 
 - [x] 3.1 Confirm that normal hover enter/leave behavior still works for tracker item rows and that compare panes remain coupled to the primary tooltip.
-- [ ] 3.2 Manually verify tooltip stability during frequent city refresh traffic, quiet dungeon conditions, group collapse changes, and item removal while hovering the tracker.
+- [x] 3.2 Manually verify tooltip stability during frequent city refresh traffic, quiet dungeon conditions, group collapse changes, and item removal while hovering the tracker.
