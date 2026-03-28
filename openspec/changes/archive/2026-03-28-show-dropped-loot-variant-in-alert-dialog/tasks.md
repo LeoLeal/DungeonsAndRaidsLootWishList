@@ -12,4 +12,4 @@
 ## 3. Verify alert behavior
 
 - [x] 3.1 Add or update tests for any pure alert-record normalization logic that can be covered locally.
-- [ ] 3.2 Verify in-game or manual test flows for immediate alerts, deferred alerts, tooltip hover, compare panes, and unreadable-payload suppression.
+- [x] 3.2 Verify in-game or manual test flows for immediate alerts, deferred alerts, tooltip hover, compare panes, and unreadable-payload suppression.

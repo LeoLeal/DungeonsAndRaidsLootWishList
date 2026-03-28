@@ -3,7 +3,7 @@
 ## Notes: Adventure Guide loot wishlist and tracker integration
 ## Notes-ruRU: Позволяет управлять списками желаемой добычи
 ## Author: Leonardo Leal
-## Version: v1.2.7
+## Version: v1.2.8
 ## SavedVariablesPerCharacter: LootWishListDB
 ## IconTexture: Interface\AddOns\DungeonsAndRaidsLootWishList\logo
 
