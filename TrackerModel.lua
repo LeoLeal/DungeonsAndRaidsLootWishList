@@ -45,7 +45,6 @@ end
 
 function TrackerModel.buildGroups(items, options)
   local groupsByKey = {}
-  local labelsByKey = {}
   local groupingMode = options and options.groupBy or "source"
   local otherLabel = options and options.otherLabel or "Other"
   otherLabel = otherLabel or "Other"
@@ -54,7 +53,6 @@ function TrackerModel.buildGroups(items, options)
   for _, item in ipairs(items) do
     local groupKey = item.groupKey or ("fallback:" .. tostring(item.groupLabel or otherLabel))
     local label = item.groupLabel or otherLabel
-    labelsByKey[groupKey] = label
 
     if groupsByKey[groupKey] == nil then
       groupsByKey[groupKey] = {
