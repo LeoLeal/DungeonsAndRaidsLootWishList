@@ -608,7 +608,7 @@ test('localization contains required wishlist keys for all supported locales', a
   const { module: locales, close } = await loadLuaModule('Locales.lua')
 
   try {
-    const requiredKeys = ['LOOT_WISHLIST', 'WISHLIST', 'REMOVE', 'OTHER', 'LOOT_SOURCE', 'EQUIPMENT_SLOT', 'DROPS_FROM', 'DROPS_FROM_RAID', 'PLAYER_LOOTED_WISHLIST_ITEM']
+    const requiredKeys = ['LOOT_WISHLIST', 'WISHLIST', 'REMOVE', 'OTHER', 'LOOT_SOURCE', 'EQUIPMENT_SLOT', 'PLAYER_LOOTED_WISHLIST_ITEM']
     const localeIds = locales.getSupportedLocales()
 
     assert.ok(Array.isArray(localeIds))
@@ -624,6 +624,337 @@ test('localization contains required wishlist keys for all supported locales', a
     }
   } finally {
     close()
+  }
+})
+
+test('slot mode tooltip footer uses a dungeon atlas without localized drops text', async () => {
+  const factory = new LuaFactory()
+  const lua = await factory.createEngine()
+  const source = fs.readFileSync(path.join(process.cwd(), 'LootWishList.lua'), 'utf8')
+    .replace(/--@do-not-package@[\s\S]*--@end-do-not-package@\s*$/, '')
+
+  try {
+    const result = await lua.doString(`
+      local function newFrame()
+        local frame = {}
+        function frame:RegisterEvent() end
+        function frame:SetScript() end
+        function frame:Hide() end
+        function frame:Show() end
+        return frame
+      end
+
+      function CreateFrame()
+        return newFrame()
+      end
+
+      function UnitName() return 'Player' end
+      function GetRealmName() return 'Realm' end
+      function GetItemInfo(itemRefOrItemID)
+        if itemRefOrItemID == 19019 then
+          return 'Dungeon Blade'
+        end
+        return nil
+      end
+      function EJ_GetInstanceInfo(instanceID)
+        if instanceID == 1 then
+          return 'The Deadmines'
+        end
+        return nil
+      end
+      function EJ_GetInstanceByIndex() return nil end
+
+      local capturedItems = nil
+      local namespace = {
+        db = {},
+        state = {
+          possessed = {},
+          bestOwnedLinks = {},
+        },
+        ItemResolver = {
+          getWishlistKey = function(item)
+            return 'item:' .. tostring(item.itemID)
+          end,
+          getVariantRef = function(itemRef)
+            return itemRef
+          end,
+          getTooltipRef = function(item)
+            return item.selectedVariantRef or ('item:' .. tostring(item.itemID))
+          end,
+        },
+        WishlistStore = {
+          getTrackedItems = function()
+            return {
+              {
+                itemID = 19019,
+                instanceID = 1,
+                inventoryType = 'INVTYPE_HEAD',
+              },
+            }
+          end,
+          getGroupingMode = function() return 'slot' end,
+        },
+        SourceResolver = {
+          resolveGroup = function(_, item)
+            return { key = 'slot:head', label = item.slotLabel, sortIndex = 1 }
+          end,
+        },
+        TrackerModel = {
+          buildGroups = function(items)
+            capturedItems = items
+            return items
+          end,
+        },
+        Locales = {
+          getString = function(_, _, key)
+            return key
+          end,
+        },
+      }
+
+      INVTYPE_HEAD = 'Head'
+
+      (function(...)
+        ${source}
+      end)('Addon', namespace)
+
+      namespace.BuildTrackerGroups()
+      return capturedItems[1].tooltipFooter
+    `)
+
+    assert.equal(result, '|A:Dungeon:16:16|a The Deadmines')
+    assert.equal(result.includes('DROPS_FROM'), false)
+    assert.equal(result.includes('Drops from:'), false)
+  } finally {
+    lua.global.close()
+  }
+})
+
+test('slot mode tooltip footer uses a raid atlas and boss name without localized drops text', async () => {
+  const factory = new LuaFactory()
+  const lua = await factory.createEngine()
+  const source = fs.readFileSync(path.join(process.cwd(), 'LootWishList.lua'), 'utf8')
+    .replace(/--@do-not-package@[\s\S]*--@end-do-not-package@\s*$/, '')
+
+  try {
+    const result = await lua.doString(`
+      local function newFrame()
+        local frame = {}
+        function frame:RegisterEvent() end
+        function frame:SetScript() end
+        function frame:Hide() end
+        function frame:Show() end
+        return frame
+      end
+
+      function CreateFrame()
+        return newFrame()
+      end
+
+      function UnitName() return 'Player' end
+      function GetRealmName() return 'Realm' end
+      function GetItemInfo(itemRefOrItemID)
+        if itemRefOrItemID == 19020 then
+          return 'Crown of Storms'
+        end
+        return nil
+      end
+      function EJ_GetInstanceInfo(instanceID)
+        if instanceID == 2 then
+          return 'Blackwing Lair'
+        end
+        return nil
+      end
+      function EJ_GetEncounterInfo(encounterID)
+        if encounterID == 99 then
+          return 'Nefarian'
+        end
+        return nil
+      end
+      function EJ_GetInstanceByIndex(index, isRaid)
+        if isRaid and index == 1 then
+          return 2
+        end
+        return nil
+      end
+
+      local capturedItems = nil
+      local namespace = {
+        db = {},
+        state = {
+          possessed = {},
+          bestOwnedLinks = {},
+        },
+        ItemResolver = {
+          getWishlistKey = function(item)
+            return 'item:' .. tostring(item.itemID)
+          end,
+          getVariantRef = function(itemRef)
+            return itemRef
+          end,
+          getTooltipRef = function(item)
+            return item.selectedVariantRef or ('item:' .. tostring(item.itemID))
+          end,
+        },
+        WishlistStore = {
+          getTrackedItems = function()
+            return {
+              {
+                itemID = 19020,
+                instanceID = 2,
+                encounterID = 99,
+                inventoryType = 'INVTYPE_HEAD',
+              },
+            }
+          end,
+          getGroupingMode = function() return 'slot' end,
+        },
+        SourceResolver = {
+          resolveGroup = function(_, item)
+            return { key = 'slot:head', label = item.slotLabel, sortIndex = 1 }
+          end,
+        },
+        TrackerModel = {
+          buildGroups = function(items)
+            capturedItems = items
+            return items
+          end,
+        },
+        Locales = {
+          getString = function(_, _, key)
+            return key
+          end,
+        },
+      }
+
+      INVTYPE_HEAD = 'Head'
+
+      (function(...)
+        ${source}
+      end)('Addon', namespace)
+
+      namespace.BuildTrackerGroups()
+      return capturedItems[1].tooltipFooter
+    `)
+
+    assert.equal(result, '|A:Raid:16:16|a Blackwing Lair - Nefarian')
+    assert.equal(result.includes('DROPS_FROM'), false)
+    assert.equal(result.includes('Drops from:'), false)
+  } finally {
+    lua.global.close()
+  }
+})
+
+test('source mode tracker rows do not build a wishlist tooltip footer', async () => {
+  const factory = new LuaFactory()
+  const lua = await factory.createEngine()
+  const source = fs.readFileSync(path.join(process.cwd(), 'LootWishList.lua'), 'utf8')
+    .replace(/--@do-not-package@[\s\S]*--@end-do-not-package@\s*$/, '')
+
+  try {
+    const result = await lua.doString(`
+      local function newFrame()
+        local frame = {}
+        function frame:RegisterEvent() end
+        function frame:SetScript() end
+        function frame:Hide() end
+        function frame:Show() end
+        return frame
+      end
+
+      function CreateFrame()
+        return newFrame()
+      end
+
+      function UnitName() return 'Player' end
+      function GetRealmName() return 'Realm' end
+      function GetItemInfo(itemRefOrItemID)
+        if itemRefOrItemID == 19020 then
+          return 'Crown of Storms'
+        end
+        return nil
+      end
+      function EJ_GetInstanceInfo(instanceID)
+        if instanceID == 2 then
+          return 'Blackwing Lair'
+        end
+        return nil
+      end
+      function EJ_GetEncounterInfo(encounterID)
+        if encounterID == 99 then
+          return 'Nefarian'
+        end
+        return nil
+      end
+      function EJ_GetInstanceByIndex(index, isRaid)
+        if isRaid and index == 1 then
+          return 2
+        end
+        return nil
+      end
+
+      local capturedItems = nil
+      local namespace = {
+        db = {},
+        state = {
+          possessed = {},
+          bestOwnedLinks = {},
+        },
+        ItemResolver = {
+          getWishlistKey = function(item)
+            return 'item:' .. tostring(item.itemID)
+          end,
+          getVariantRef = function(itemRef)
+            return itemRef
+          end,
+          getTooltipRef = function(item)
+            return item.selectedVariantRef or ('item:' .. tostring(item.itemID))
+          end,
+        },
+        WishlistStore = {
+          getTrackedItems = function()
+            return {
+              {
+                itemID = 19020,
+                instanceID = 2,
+                encounterID = 99,
+                inventoryType = 'INVTYPE_HEAD',
+              },
+            }
+          end,
+          getGroupingMode = function() return 'source' end,
+        },
+        SourceResolver = {
+          resolveGroup = function(_, item)
+            return { key = 'source:instance:2', label = item.instanceName, sortIndex = 1 }
+          end,
+        },
+        TrackerModel = {
+          buildGroups = function(items)
+            capturedItems = items
+            return items
+          end,
+        },
+        Locales = {
+          getString = function(_, _, key)
+            return key
+          end,
+        },
+      }
+
+      INVTYPE_HEAD = 'Head'
+
+      (function(...)
+        ${source}
+      end)('Addon', namespace)
+
+      namespace.BuildTrackerGroups()
+      return capturedItems[1].tooltipFooter
+    `)
+
+    assert.equal(result, null)
+  } finally {
+    lua.global.close()
   }
 })
 

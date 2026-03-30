@@ -13,6 +13,9 @@ namespace.eventFrame = eventFrame
 
 local RECENT_SELF_LOOT_TTL_SECONDS = 3
 local TRACK_INFO_REFRESH_MAX_ATTEMPTS = 3
+local TOOLTIP_SOURCE_ATLAS_SIZE = 24
+local TOOLTIP_SOURCE_DUNGEON_ATLAS = "Dungeon"
+local TOOLTIP_SOURCE_RAID_ATLAS = "Raid"
 
 local function getCharacterKey()
   local name = UnitName("player") or "Unknown"
@@ -599,6 +602,14 @@ local function getInventoryTypeLabel(inventoryType)
   return inventoryType
 end
 
+local function buildInlineAtlasMarkup(atlasName)
+  if type(atlasName) ~= "string" or atlasName == "" then
+    return nil
+  end
+
+  return string.format("|A:%s:%d:%d|a", atlasName, TOOLTIP_SOURCE_ATLAS_SIZE, TOOLTIP_SOURCE_ATLAS_SIZE)
+end
+
 local function buildTooltipFooter(groupingMode, item)
   if groupingMode ~= "slot" then
     return nil
@@ -609,12 +620,17 @@ local function buildTooltipFooter(groupingMode, item)
     return nil
   end
 
-  local bossName = resolveBossName(item.encounterID, item.instanceID)
-  if bossName and bossName ~= "" and isRaidInstance(item.instanceID) then
-    return namespace.GetText("DROPS_FROM_RAID", sourceLabel, bossName)
+  local raidSource = isRaidInstance(item.instanceID)
+  if raidSource then
+    local bossName = resolveBossName(item.encounterID, item.instanceID)
+    if type(bossName) ~= "string" or bossName == "" then
+      return nil
+    end
+
+    return string.format("%s%s - %s", buildInlineAtlasMarkup(TOOLTIP_SOURCE_RAID_ATLAS), sourceLabel, bossName)
   end
 
-  return namespace.GetText("DROPS_FROM", sourceLabel)
+  return string.format("%s%s", buildInlineAtlasMarkup(TOOLTIP_SOURCE_DUNGEON_ATLAS), sourceLabel)
 end
 
 function namespace.BuildTrackerGroups()
@@ -627,7 +643,8 @@ function namespace.BuildTrackerGroups()
     local effectiveDisplayVariant = resolveEffectiveDisplayVariant(item, bestOwnedLinks)
     local key = namespace.ItemResolver.getWishlistKey({ itemID = item.itemID })
     local sourceLabel = resolveInstanceName(item.instanceID)
-    local itemName = getItemInfoName(effectiveDisplayVariant) or getItemInfoName(item.itemID) or ("Item " .. tostring(item.itemID))
+    local itemName = getItemInfoName(effectiveDisplayVariant) or getItemInfoName(item.itemID) or
+        ("Item " .. tostring(item.itemID))
     local group = namespace.SourceResolver.resolveGroup(groupingMode, {
       instanceID = item.instanceID,
       instanceName = sourceLabel,
@@ -1011,7 +1028,8 @@ SlashCmdList["LWTESTROLL"] = function(msg)
   _G["GroupLootFrame5"] = nil -- Clean up the global taint
 
   local displayedQuality = forcedQuality or select(3, GetItemInfo(itemLink)) or 4
-  print("LootWishList: Created and showed a template GroupLootFrame for " .. (testItem.itemName or "Test Item") .. " at rarity " .. tostring(displayedQuality) .. "!")
+  print("LootWishList: Created and showed a template GroupLootFrame for " ..
+    (testItem.itemName or "Test Item") .. " at rarity " .. tostring(displayedQuality) .. "!")
 end
 
 SLASH_LWTESTALERT1 = "/testalert"

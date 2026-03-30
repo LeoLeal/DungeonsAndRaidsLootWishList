@@ -8,8 +8,6 @@ local translations = {
     OTHER = "Other",
     LOOT_SOURCE = "Source",
     EQUIPMENT_SLOT = "Slot",
-    DROPS_FROM = "Drops from: %s",
-    DROPS_FROM_RAID = "Drops from: %s - %s",
     PLAYER_LOOTED_WISHLIST_ITEM = "%s looted an item on your Wishlist!",
   },
   enGB = {
@@ -19,8 +17,6 @@ local translations = {
     OTHER = "Other",
     LOOT_SOURCE = "Source",
     EQUIPMENT_SLOT = "Slot",
-    DROPS_FROM = "Drops from: %s",
-    DROPS_FROM_RAID = "Drops from: %s - %s",
     PLAYER_LOOTED_WISHLIST_ITEM = "%s looted an item on your Wishlist!",
   },
   deDE = {
@@ -30,8 +26,6 @@ local translations = {
     OTHER = "Sonstiges",
     LOOT_SOURCE = "Quelle",
     EQUIPMENT_SLOT = "Slot",
-    DROPS_FROM = "Droppt in: %s",
-    DROPS_FROM_RAID = "Droppt in: %s - %s",
     PLAYER_LOOTED_WISHLIST_ITEM = "%s hat einen Gegenstand von deiner Wunschliste erbeutet!",
   },
   esES = {
@@ -41,8 +35,6 @@ local translations = {
     OTHER = "Otros",
     LOOT_SOURCE = "Fuente",
     EQUIPMENT_SLOT = "Ranura",
-    DROPS_FROM = "Cae en: %s",
-    DROPS_FROM_RAID = "Cae en: %s - %s",
     PLAYER_LOOTED_WISHLIST_ITEM = "¡%s ha saqueado un objeto de tu lista de deseos!",
   },
   esMX = {
@@ -52,8 +44,6 @@ local translations = {
     OTHER = "Otros",
     LOOT_SOURCE = "Fuente",
     EQUIPMENT_SLOT = "Ranura",
-    DROPS_FROM = "Cae en: %s",
-    DROPS_FROM_RAID = "Cae en: %s - %s",
     PLAYER_LOOTED_WISHLIST_ITEM = "¡%s ha saqueado un objeto de tu lista de deseos!",
   },
   frFR = {
@@ -63,8 +53,6 @@ local translations = {
     OTHER = "Autre",
     LOOT_SOURCE = "Source",
     EQUIPMENT_SLOT = "Slot",
-    DROPS_FROM = "Tombe sur : %s",
-    DROPS_FROM_RAID = "Tombe sur : %s - %s",
     PLAYER_LOOTED_WISHLIST_ITEM = "%s a obtenu un objet de votre liste de souhaits !",
   },
   itIT = {
@@ -74,8 +62,6 @@ local translations = {
     OTHER = "Altro",
     LOOT_SOURCE = "Fonte",
     EQUIPMENT_SLOT = "Slot",
-    DROPS_FROM = "Droppa da: %s",
-    DROPS_FROM_RAID = "Droppa da: %s - %s",
     PLAYER_LOOTED_WISHLIST_ITEM = "%s ha ottenuto un oggetto dalla tua lista dei desideri!",
   },
   koKR = {
@@ -85,8 +71,6 @@ local translations = {
     OTHER = "기타",
     LOOT_SOURCE = "출처",
     EQUIPMENT_SLOT = "슬롯",
-    DROPS_FROM = "획득처: %s",
-    DROPS_FROM_RAID = "획득처: %s - %s",
     PLAYER_LOOTED_WISHLIST_ITEM = "%s님이 위시리스트에 있는 아이템을 전리품으로 획득했습니다!",
   },
   ptBR = {
@@ -96,8 +80,6 @@ local translations = {
     OTHER = "Outros",
     LOOT_SOURCE = "Fonte",
     EQUIPMENT_SLOT = "Slot",
-    DROPS_FROM = "Cai em: %s",
-    DROPS_FROM_RAID = "Cai em: %s - %s",
     PLAYER_LOOTED_WISHLIST_ITEM = "%s saqueou um item da sua Lista de Desejos!",
   },
   ruRU = {
@@ -107,8 +89,6 @@ local translations = {
     OTHER = "Другое",
     LOOT_SOURCE = "Источник",
     EQUIPMENT_SLOT = "Слот",
-    DROPS_FROM = "Выпадает из: %s",
-    DROPS_FROM_RAID = "Выпадает из: %s - %s",
     PLAYER_LOOTED_WISHLIST_ITEM = "%s получил(а) предмет из Вашего списка желаний!",
   },
   zhCN = {
@@ -118,8 +98,6 @@ local translations = {
     OTHER = "其他",
     LOOT_SOURCE = "来源",
     EQUIPMENT_SLOT = "栏位",
-    DROPS_FROM = "掉落自：%s",
-    DROPS_FROM_RAID = "掉落自：%s - %s",
     PLAYER_LOOTED_WISHLIST_ITEM = "%s 拾取了您愿望清单上的一件物品！",
   },
   zhTW = {
@@ -129,8 +107,6 @@ local translations = {
     OTHER = "其他",
     LOOT_SOURCE = "來源",
     EQUIPMENT_SLOT = "欄位",
-    DROPS_FROM = "掉落自：%s",
-    DROPS_FROM_RAID = "掉落自：%s - %s",
     PLAYER_LOOTED_WISHLIST_ITEM = "%s 拾取了您願望清單上的一件物品！",
   },
 }
