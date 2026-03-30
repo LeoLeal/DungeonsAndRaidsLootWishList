@@ -20,7 +20,7 @@ async function loadLuaModule(relativePath) {
   }
 }
 
-test('wishlist store persists tracked items and best looted item levels per character', async () => {
+test('wishlist store persists normalized tracked items and best looted item levels per character', async () => {
   const factory = new LuaFactory()
   const lua = await factory.createEngine()
   const source = fs.readFileSync(path.join(process.cwd(), 'WishlistStore.lua'), 'utf8').replace(/return WishlistStore\s*$/, '')
@@ -30,22 +30,25 @@ test('wishlist store persists tracked items and best looted item levels per char
       local db = {}
       WishlistStore.setTracked(db, 'Player-Realm', 19019, true)
       WishlistStore.setItemMetadata(db, 'Player-Realm', 19019, {
-        itemName = 'Thunderfury',
         encounterID = 11502,
         instanceID = 469,
-        bossName = 'Nefarian',
-        inventoryType = 'INVTYPE_WEAPON'
+        inventoryType = 'INVTYPE_WEAPON',
+        selectedVariantRef = 'item:19019::::::::70::5:1:3524::::::'
       })
       WishlistStore.updateBestLootedItemLevel(db, 'Player-Realm', 19019, 262)
       local items = WishlistStore.getTrackedItems(db, 'Player-Realm')
+      local entry = WishlistStore.getExistingItemEntry(db, 'Player-Realm', 19019)
       return {
         tracked = WishlistStore.isTracked(db, 'Player-Realm', 19019),
         best = WishlistStore.getBestLootedItemLevel(db, 'Player-Realm', 19019),
         count = #items,
         encounterID = items[1].encounterID,
         instanceID = items[1].instanceID,
-        bossName = items[1].bossName,
         inventoryType = items[1].inventoryType,
+        selectedVariantRef = items[1].selectedVariantRef,
+        savedItemName = entry.itemName,
+        savedItemLink = entry.itemLink,
+        savedSourceLabel = entry.sourceLabel,
       }
     `)
 
@@ -54,8 +57,36 @@ test('wishlist store persists tracked items and best looted item levels per char
     assert.equal(result.count, 1)
     assert.equal(result.encounterID, 11502)
     assert.equal(result.instanceID, 469)
-    assert.equal(result.bossName, 'Nefarian')
     assert.equal(result.inventoryType, 'INVTYPE_WEAPON')
+    assert.equal(result.selectedVariantRef, 'item:19019::::::::70::5:1:3524::::::')
+    assert.equal(result.savedItemName, undefined)
+    assert.equal(result.savedItemLink, undefined)
+    assert.equal(result.savedSourceLabel, undefined)
+  } finally {
+    lua.global.close()
+  }
+})
+
+test('wishlist store removes untracked items instead of persisting tombstones', async () => {
+  const factory = new LuaFactory()
+  const lua = await factory.createEngine()
+  const source = fs.readFileSync(path.join(process.cwd(), 'WishlistStore.lua'), 'utf8').replace(/return WishlistStore\s*$/, '')
+
+  try {
+    const result = await lua.doString(`${source}
+      local db = {}
+      WishlistStore.setTracked(db, 'Player-Realm', 19019, true)
+      WishlistStore.removeItem(db, 'Player-Realm', 19019)
+      return {
+        tracked = WishlistStore.isTracked(db, 'Player-Realm', 19019),
+        entry = WishlistStore.getExistingItemEntry(db, 'Player-Realm', 19019),
+        count = #WishlistStore.getTrackedItems(db, 'Player-Realm'),
+      }
+    `)
+
+    assert.equal(result.tracked, false)
+    assert.equal(result.entry, undefined)
+    assert.equal(result.count, 0)
   } finally {
     lua.global.close()
   }
@@ -92,7 +123,7 @@ test('wishlist store persists grouping mode and collapse state separately per mo
   }
 })
 
-test('wishlist store repairs missing inventory types and clears non-raid boss names', async () => {
+test('wishlist store repairs missing inventory types and strips legacy localized fields', async () => {
   const factory = new LuaFactory()
   const lua = await factory.createEngine()
   const source = fs.readFileSync(path.join(process.cwd(), 'WishlistStore.lua'), 'utf8').replace(/return WishlistStore\s*$/, '')
@@ -112,7 +143,8 @@ test('wishlist store repairs missing inventory types and clears non-raid boss na
               ['19019'] = {
                 tracked = true,
                 instanceID = 42,
-                bossName = 'Not A Raid Boss'
+                itemName = 'Legacy Name',
+                sourceLabel = 'Legacy Source'
               }
             }
           }
@@ -129,13 +161,86 @@ test('wishlist store repairs missing inventory types and clears non-raid boss na
       return {
         changed = changed,
         inventoryType = entry.inventoryType,
-        bossName = entry.bossName,
+        selectedVariantRef = entry.selectedVariantRef,
+        rawItemName = db.characters['Player-Realm'].items['19019'].itemName,
+        rawSourceLabel = db.characters['Player-Realm'].items['19019'].sourceLabel,
       }
     `)
 
     assert.equal(result.changed, true)
     assert.equal(result.inventoryType, 'INVTYPE_HEAD')
-    assert.equal(result.bossName, undefined)
+    assert.equal(result.selectedVariantRef, undefined)
+    assert.equal(result.rawItemName, undefined)
+    assert.equal(result.rawSourceLabel, undefined)
+  } finally {
+    lua.global.close()
+  }
+})
+
+test('wishlist store migrates legacy entries to normalized storage idempotently', async () => {
+  const factory = new LuaFactory()
+  const lua = await factory.createEngine()
+  const source = fs.readFileSync(path.join(process.cwd(), 'WishlistStore.lua'), 'utf8').replace(/return WishlistStore\s*$/, '')
+
+  try {
+    const result = await lua.doString(`
+      ${source}
+
+      local db = {
+        version = 3,
+        characters = {
+          ['Player-Realm'] = {
+            items = {
+              ['19019'] = {
+                tracked = true,
+                itemName = 'Thunderfury',
+                itemLink = '|cffa335ee|Hitem:19019::::::::70::5:1:3524::::::|h[Thunderfury]|h|r',
+                sourceLabel = 'Blackwing Lair',
+                bossName = 'Nefarian',
+                bestLootedItemLevel = 278,
+                instanceID = 469,
+                encounterID = 11583,
+                inventoryType = 'INVTYPE_WEAPON',
+              },
+              ['17182'] = {
+                tracked = false,
+                itemLink = '|Hitem:17182::::::::70:::::|h[Sulfuras]|h',
+              },
+            },
+          },
+        },
+      }
+
+      local namespace = {
+        ItemResolver = {
+          getVariantRef = function(itemRef)
+            return itemRef:match('|H([^|]+)|h') or itemRef
+          end,
+        },
+      }
+
+      WishlistStore.runMigration(db, namespace)
+      WishlistStore.runMigration(db, namespace)
+
+      local entry = WishlistStore.getExistingItemEntry(db, 'Player-Realm', 19019)
+      return {
+        version = db.version,
+        trackedCount = #WishlistStore.getTrackedItems(db, 'Player-Realm'),
+        hasTrackedEntry = entry ~= nil,
+        selectedVariantRef = entry and entry.selectedVariantRef or nil,
+        itemName = entry and entry.itemName or nil,
+        sourceLabel = entry and entry.sourceLabel or nil,
+        removedTombstone = WishlistStore.getExistingItemEntry(db, 'Player-Realm', 17182),
+      }
+    `)
+
+    assert.equal(result.version, 4)
+    assert.equal(result.trackedCount, 1)
+    assert.equal(result.hasTrackedEntry, true)
+    assert.equal(result.selectedVariantRef, 'item:19019::::::::70::5:1:3524::::::')
+    assert.equal(result.itemName, undefined)
+    assert.equal(result.sourceLabel, undefined)
+    assert.equal(result.removedTombstone, undefined)
   } finally {
     lua.global.close()
   }
@@ -152,6 +257,10 @@ test('item resolver collapses higher item level variants to the same wishlist ke
     assert.equal(normalized.encounterID, 11502)
     assert.equal(normalized.instanceID, 469)
     assert.equal(normalized.inventoryType, 'INVTYPE_WEAPON')
+    assert.equal(
+      resolver.getVariantRef('|cffa335ee|Hitem:19019::::::::70::5:1:3524::::::|h[Thunderfury]|h|r'),
+      'item:19019::::::::70::5:1:3524::::::'
+    )
   } finally {
     close()
   }
@@ -229,7 +338,7 @@ test('tracker model groups rows by source and keeps best ilvl separate from poss
 
   try {
     const grouped = trackerModel.buildGroups([
-      { itemID: 1, itemName: 'Stormlash Dagger', groupKey: 'source:instance:1', groupLabel: 'Operation: Floodgate', isPossessed: false, bestLootedItemLevel: 262 },
+      { itemID: 1, itemName: 'Stormlash Dagger', groupKey: 'source:instance:1', groupLabel: 'Operation: Floodgate', isPossessed: false, bestLootedItemLevel: 262, itemTrack: 'Champion' },
       { itemID: 2, itemName: 'Circuit Breaker', groupKey: 'source:instance:1', groupLabel: 'Operation: Floodgate', isPossessed: true },
       { itemID: 3, itemName: 'Unknown Relic', groupKey: 'source:other', groupLabel: 'Other', isPossessed: false },
     ], { groupBy: 'source', otherLabel: 'Other' })
@@ -238,7 +347,7 @@ test('tracker model groups rows by source and keeps best ilvl separate from poss
     assert.equal(grouped[0].key, 'source:instance:1')
     assert.equal(grouped[0].mode, 'source')
     assert.equal(grouped[0].label, 'Operation: Floodgate')
-    assert.equal(grouped[0].items[0].displayText, 'Stormlash Dagger (262)')
+    assert.equal(grouped[0].items[0].displayText, 'Stormlash Dagger (262 Champion)')
     assert.equal(grouped[0].items[0].showTick, false)
     assert.equal(grouped[0].items[1].displayText, 'Circuit Breaker')
     assert.equal(grouped[0].items[1].showTick, true)
@@ -397,13 +506,18 @@ test('set tracked from item data works before raid helpers are defined later in 
       local primedInstanceId = nil
       local namespace = {
         db = {},
-        state = {},
+        state = {
+          possessed = {},
+          bestOwnedLinks = {},
+        },
         ItemResolver = {
           normalizeItemData = function(itemData)
             return itemData
           end,
           getItemIdFromLink = function() return nil end,
           getWishlistKey = function(item) return 'item:' .. tostring(item.itemID) end,
+          getVariantRef = function(itemRef) return itemRef end,
+          getTooltipRef = function(item) return item.selectedVariantRef or ('item:' .. tostring(item.itemID)) end,
         },
         WishlistStore = {
           isTracked = function() return false end,
@@ -462,6 +576,7 @@ test('set tracked from item data works before raid helpers are defined later in 
       namespace.SetTrackedFromItemData({
         itemID = 19019,
         itemName = 'Thunderfury',
+        selectedVariantRef = 'item:19019::::::::70::5:1:3524::::::',
         instanceID = 469,
         encounterID = 11583,
         inventoryType = 'INVTYPE_WEAPON',
@@ -471,6 +586,8 @@ test('set tracked from item data works before raid helpers are defined later in 
       return {
         trackedItemId = trackedItemId,
         inventoryType = trackedMetadata and trackedMetadata.inventoryType or nil,
+        selectedVariantRef = trackedMetadata and trackedMetadata.selectedVariantRef or nil,
+        itemName = trackedMetadata and trackedMetadata.itemName or nil,
         primedInstanceId = primedInstanceId,
         refreshed = refreshed,
       }
@@ -478,6 +595,8 @@ test('set tracked from item data works before raid helpers are defined later in 
 
     assert.equal(result.trackedItemId, 19019)
     assert.equal(result.inventoryType, 'INVTYPE_WEAPON')
+    assert.equal(result.selectedVariantRef, 'item:19019::::::::70::5:1:3524::::::')
+    assert.equal(result.itemName, undefined)
     assert.equal(result.primedInstanceId, 469)
     assert.equal(result.refreshed, 1)
   } finally {
@@ -525,15 +644,14 @@ test('tracker row style uses quest-style check atlas and row padding', async () 
   }
 })
 
-test('item resolver getTooltipRef prefers saved item link over stable identity fallback', async () => {
+test('item resolver getTooltipRef prefers selected variant ref over stable identity fallback', async () => {
   const { module: resolver, close } = await loadLuaModule('ItemResolver.lua')
 
   try {
-    const link = '|Hitem:19019::::::::70:::::|h[Thunderfury]|h'
     assert.equal(
-      resolver.getTooltipRef({ itemID: 19019, itemLink: link }),
-      link,
-      'should return the saved item link when present'
+      resolver.getTooltipRef({ itemID: 19019, selectedVariantRef: 'item:19019::::::::70::5:1:3524::::::' }),
+      'item:19019::::::::70::5:1:3524::::::',
+      'should return the normalized selected variant when present'
     )
   } finally {
     close()
@@ -556,6 +674,270 @@ test('item resolver getTooltipRef falls back to stable item identity when no lin
     )
   } finally {
     close()
+  }
+})
+
+test('loot wishlist resolves effective display variant by owned link, then selected variant, then item id', async () => {
+  const factory = new LuaFactory()
+  const lua = await factory.createEngine()
+  const source = fs.readFileSync(path.join(process.cwd(), 'LootWishList.lua'), 'utf8')
+    .replace(/--@do-not-package@[\s\S]*--@end-do-not-package@\s*$/, '')
+
+  try {
+    const result = await lua.doString(`
+      local function newFrame()
+        local frame = {}
+        function frame:RegisterEvent() end
+        function frame:SetScript() end
+        function frame:Hide() end
+        function frame:Show() end
+        return frame
+      end
+
+      function CreateFrame()
+        return newFrame()
+      end
+
+      function UnitName() return 'Player' end
+      function GetRealmName() return 'Realm' end
+
+      local namespace = {
+        db = {},
+        state = {
+          bestOwnedLinks = {
+            ['item:19019'] = '|Hitem:19019::::::::70::6:1:3524::::::|h[Owned]|h',
+          },
+        },
+        ItemResolver = {
+          getWishlistKey = function(item)
+            return 'item:' .. tostring(item.itemID)
+          end,
+          getVariantRef = function(itemRef)
+            return itemRef and (itemRef:match('|H([^|]+)|h') or itemRef) or nil
+          end,
+          getTooltipRef = function(item)
+            if item.selectedVariantRef then return item.selectedVariantRef end
+            return 'item:' .. tostring(item.itemID)
+          end,
+        },
+      }
+
+      (function(...)
+        ${source}
+      end)('Addon', namespace)
+
+      return {
+        owned = namespace.ResolveEffectiveDisplayVariant({ itemID = 19019, selectedVariantRef = 'item:19019::::::::70::5:1:3524::::::' }),
+        selected = namespace.ResolveEffectiveDisplayVariant({ itemID = 17182, selectedVariantRef = 'item:17182::::::::70::5:1:3524::::::' }),
+        fallback = namespace.ResolveEffectiveDisplayVariant({ itemID = 18832 }),
+      }
+    `)
+
+    assert.equal(result.owned, '|Hitem:19019::::::::70::6:1:3524::::::|h[Owned]|h')
+    assert.equal(result.selected, 'item:17182::::::::70::5:1:3524::::::')
+    assert.equal(result.fallback, 'item:18832')
+  } finally {
+    lua.global.close()
+  }
+})
+
+test('loot wishlist extracts localized item track from structured tooltip data', async () => {
+  const factory = new LuaFactory()
+  const lua = await factory.createEngine()
+  const source = fs.readFileSync(path.join(process.cwd(), 'LootWishList.lua'), 'utf8')
+    .replace(/--@do-not-package@[\s\S]*--@end-do-not-package@\s*$/, '')
+
+  try {
+    const result = await lua.doString(`
+      local function newFrame()
+        local frame = {}
+        function frame:RegisterEvent() end
+        function frame:SetScript() end
+        return frame
+      end
+
+      function CreateFrame()
+        return newFrame()
+      end
+
+      Enum = {
+        TooltipDataLineType = {
+          ItemUpgradeLevel = 42,
+        },
+      }
+
+      local namespace = {
+        db = {},
+        state = {},
+      }
+
+      (function(...)
+        ${source}
+      end)('Addon', namespace)
+
+      return namespace.ExtractItemTrackFromTooltipData({
+        lines = {
+          { type = 1, leftText = 'Ignored' },
+          { type = 42, leftText = 'Champion 3/8' },
+        },
+      })
+    `)
+
+    assert.equal(result, 'Champion 3/8')
+  } finally {
+    lua.global.close()
+  }
+})
+
+test('loot wishlist trims prefixed upgrade tooltip text down to the track label', async () => {
+  const factory = new LuaFactory()
+  const lua = await factory.createEngine()
+  const source = fs.readFileSync(path.join(process.cwd(), 'LootWishList.lua'), 'utf8')
+    .replace(/--@do-not-package@[\s\S]*--@end-do-not-package@\s*$/, '')
+
+  try {
+    const result = await lua.doString(`
+      local function newFrame()
+        local frame = {}
+        function frame:RegisterEvent() end
+        function frame:SetScript() end
+        return frame
+      end
+
+      function CreateFrame()
+        return newFrame()
+      end
+
+      local namespace = {
+        db = {},
+        state = {},
+      }
+
+      (function(...)
+        ${source}
+      end)('Addon', namespace)
+
+      return {
+        prefixed = namespace.TrimItemTrackLabel('Upgrade Level: Champion 3/8'),
+        plain = namespace.TrimItemTrackLabel('Champion 3/8'),
+      }
+    `)
+
+    assert.equal(result.prefixed, 'Champion')
+    assert.equal(result.plain, 'Champion')
+  } finally {
+    lua.global.close()
+  }
+})
+
+test('loot wishlist tracker display text uses the trimmed track label', async () => {
+  const factory = new LuaFactory()
+  const lua = await factory.createEngine()
+  const source = fs.readFileSync(path.join(process.cwd(), 'LootWishList.lua'), 'utf8')
+    .replace(/--@do-not-package@[\s\S]*--@end-do-not-package@\s*$/, '')
+
+  try {
+    const result = await lua.doString(`
+      local function newFrame()
+        local frame = {}
+        function frame:RegisterEvent() end
+        function frame:SetScript() end
+        function frame:Hide() end
+        function frame:Show() end
+        return frame
+      end
+
+      function CreateFrame()
+        return newFrame()
+      end
+
+      function UnitName() return 'Player' end
+      function GetRealmName() return 'Realm' end
+      function GetItemInfo(itemRefOrItemID)
+        if itemRefOrItemID == 'item:19019::::::::70::5:1:3524::::::' or itemRefOrItemID == 19019 then
+          return 'Stormlash Dagger'
+        end
+        return nil
+      end
+
+      Enum = {
+        TooltipDataLineType = {
+          ItemUpgradeLevel = 42,
+        },
+      }
+
+      C_TooltipInfo = {
+        GetHyperlink = function(itemRef)
+          return {
+            lines = {
+              { type = 42, leftText = 'Upgrade Level: Champion 3/8' },
+            },
+          }
+        end,
+      }
+
+      local namespace = {
+        db = {},
+        state = {
+          possessed = {},
+          bestOwnedLinks = {},
+        },
+        ItemResolver = {
+          getWishlistKey = function(item)
+            return 'item:' .. tostring(item.itemID)
+          end,
+          getVariantRef = function(itemRef)
+            return itemRef
+          end,
+          getTooltipRef = function(item)
+            return item.selectedVariantRef or ('item:' .. tostring(item.itemID))
+          end,
+        },
+        WishlistStore = {
+          getTrackedItems = function()
+            return {
+              {
+                itemID = 19019,
+                selectedVariantRef = 'item:19019::::::::70::5:1:3524::::::',
+                bestLootedItemLevel = 262,
+                instanceID = 1,
+              },
+            }
+          end,
+          getGroupingMode = function() return 'source' end,
+        },
+        SourceResolver = {
+          resolveGroup = function(_, item, otherLabel)
+            return { key = 'source:instance:1', label = item.instanceName or otherLabel }
+          end,
+        },
+        TrackerModel = {
+          buildGroups = function(items)
+            return items
+          end,
+        },
+        Locales = {
+          getString = function(_, _, key)
+            return key
+          end,
+        },
+      }
+
+      (function(...)
+        ${source}
+      end)('Addon', namespace)
+
+      local item = namespace.BuildTrackerGroups()[1]
+      return {
+        itemTrack = item.itemTrack,
+        bestLootedItemLevel = item.bestLootedItemLevel,
+      }
+    `)
+
+    assert.equal(result.itemTrack, 'Champion')
+    assert.equal(`${result.bestLootedItemLevel} ${result.itemTrack}`, '262 Champion')
+  } finally {
+    lua.global.close()
   }
 })
 
@@ -868,11 +1250,7 @@ test('build loot alert record requires the caller-provided item link', async () 
         WishlistStore = {
           getExistingItemEntry = function(_, _, itemID)
             if itemID == 19019 then
-              return {
-                tracked = true,
-                itemName = 'Thunderfury',
-                itemLink = '|Hitem:19019::::::::70:::::|h[Saved Thunderfury]|h',
-              }
+              return {}
             end
             return nil
           end,
@@ -881,6 +1259,7 @@ test('build loot alert record requires the caller-provided item link', async () 
 
       function UnitName() return 'Player' end
       function GetRealmName() return 'Realm' end
+      function GetItemInfo(itemID) return 'Thunderfury' end
 
       (function(...)
         ${source}

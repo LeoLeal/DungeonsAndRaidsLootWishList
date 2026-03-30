@@ -106,6 +106,7 @@ local function buildItemData(namespace, frame)
   return {
     itemID = itemID,
     itemLink = itemLink,
+    selectedVariantRef = namespace.ItemResolver.getVariantRef(itemLink),
     itemName = extractTextFromFrame(frame),
     encounterID = encounterID,
     instanceID = instanceID,

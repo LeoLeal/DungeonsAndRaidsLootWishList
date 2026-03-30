@@ -12,6 +12,7 @@ local eventFrame = CreateFrame("Frame")
 namespace.eventFrame = eventFrame
 
 local RECENT_SELF_LOOT_TTL_SECONDS = 3
+local TRACK_INFO_REFRESH_MAX_ATTEMPTS = 3
 
 local function getCharacterKey()
   local name = UnitName("player") or "Unknown"
@@ -127,6 +128,32 @@ end
 
 local isRaidInstance
 
+local function getItemInfoName(itemRefOrItemID)
+  if type(GetItemInfo) ~= "function" then
+    return nil
+  end
+
+  local itemName = GetItemInfo(itemRefOrItemID)
+  if type(itemName) == "string" and itemName ~= "" then
+    return itemName
+  end
+
+  return nil
+end
+
+local function resolveInstanceName(instanceID)
+  if type(instanceID) ~= "number" or instanceID <= 0 or type(EJ_GetInstanceInfo) ~= "function" then
+    return nil
+  end
+
+  local instanceName = EJ_GetInstanceInfo(instanceID)
+  if type(instanceName) == "string" and instanceName ~= "" then
+    return instanceName
+  end
+
+  return nil
+end
+
 local function getItemLevel(itemLink)
   if type(GetDetailedItemLevelInfo) == "function" and itemLink then
     return GetDetailedItemLevelInfo(itemLink)
@@ -238,6 +265,145 @@ function namespace.GetCurrentSourceLabel(itemData)
   return namespace.GetText("OTHER")
 end
 
+local function extractTooltipLineText(lineData)
+  if type(lineData) ~= "table" then
+    return nil
+  end
+
+  local candidates = {
+    lineData.leftText,
+    lineData.text,
+    lineData.rightText,
+  }
+
+  for _, value in ipairs(candidates) do
+    if type(value) == "string" and value ~= "" then
+      return value
+    end
+  end
+
+  return nil
+end
+
+local function getItemTrackCache()
+  namespace.state.itemTrackCache = namespace.state.itemTrackCache or {}
+  return namespace.state.itemTrackCache
+end
+
+local function getPendingItemTrackRefreshes()
+  namespace.state.pendingItemTrackRefreshes = namespace.state.pendingItemTrackRefreshes or {}
+  return namespace.state.pendingItemTrackRefreshes
+end
+
+local function schedulePendingTrackRefresh(itemRef)
+  if type(itemRef) ~= "string" or itemRef == "" then
+    return
+  end
+
+  local pending = getPendingItemTrackRefreshes()
+  local current = pending[itemRef] or { attempts = 0 }
+  if current.attempts >= TRACK_INFO_REFRESH_MAX_ATTEMPTS then
+    return
+  end
+
+  current.attempts = current.attempts + 1
+  pending[itemRef] = current
+  namespace.state.hasPendingItemTrackRefresh = true
+end
+
+local function extractItemTrackFromTooltipData(tooltipData)
+  if type(tooltipData) ~= "table" then
+    return nil
+  end
+
+  local targetLineType = Enum and Enum.TooltipDataLineType and Enum.TooltipDataLineType.ItemUpgradeLevel or nil
+  local lines = tooltipData.lines or tooltipData.tooltipDataLines
+  if type(lines) ~= "table" then
+    return nil
+  end
+
+  for _, lineData in ipairs(lines) do
+    local lineType = type(lineData) == "table" and (lineData.type or lineData.lineType) or nil
+    if targetLineType == nil or lineType == targetLineType then
+      local lineText = extractTooltipLineText(lineData)
+      if lineText then
+        return lineText
+      end
+    end
+  end
+
+  return nil
+end
+
+local function trimItemTrackLabel(itemTrack)
+  if type(itemTrack) ~= "string" then
+    return nil
+  end
+
+  local trimmed = itemTrack:match("^%s*(.-)%s*$")
+  if trimmed == "" then
+    return nil
+  end
+
+  trimmed = trimmed:gsub("^.-:%s*", "")
+  trimmed = trimmed:gsub("%s+%d+/%d+%s*$", "")
+  trimmed = trimmed:match("^%s*(.-)%s*$")
+
+  if trimmed == "" then
+    return nil
+  end
+
+  return trimmed
+end
+
+local function getLocalizedItemTrack(itemRef)
+  local normalizedRef = namespace.ItemResolver.getTooltipRef({ selectedVariantRef = itemRef })
+  if type(normalizedRef) ~= "string" then
+    return nil
+  end
+
+  local cache = getItemTrackCache()
+  local cached = cache[normalizedRef]
+  if cached ~= nil then
+    return cached ~= false and cached or nil
+  end
+
+  if type(C_TooltipInfo) ~= "table" or type(C_TooltipInfo.GetHyperlink) ~= "function" then
+    return nil
+  end
+
+  local tooltipData = C_TooltipInfo.GetHyperlink(normalizedRef)
+  local itemTrack = trimItemTrackLabel(extractItemTrackFromTooltipData(tooltipData))
+  if itemTrack then
+    cache[normalizedRef] = itemTrack
+    return itemTrack
+  end
+
+  cache[normalizedRef] = false
+  schedulePendingTrackRefresh(normalizedRef)
+  return nil
+end
+
+local function resolveEffectiveDisplayVariant(item, bestOwnedLinks)
+  bestOwnedLinks = bestOwnedLinks or namespace.state.bestOwnedLinks or {}
+  local key = namespace.ItemResolver.getWishlistKey({ itemID = item.itemID })
+  local bestOwnedLink = key and bestOwnedLinks[key] or nil
+  if type(bestOwnedLink) == "string" and bestOwnedLink ~= "" then
+    return bestOwnedLink
+  end
+
+  local selectedVariantRef = namespace.ItemResolver.getVariantRef(item.selectedVariantRef)
+  if selectedVariantRef then
+    return selectedVariantRef
+  end
+
+  return namespace.ItemResolver.getTooltipRef({ itemID = item.itemID })
+end
+
+namespace.ResolveEffectiveDisplayVariant = resolveEffectiveDisplayVariant
+namespace.ExtractItemTrackFromTooltipData = extractItemTrackFromTooltipData
+namespace.TrimItemTrackLabel = trimItemTrackLabel
+
 function namespace.SetTrackedFromItemData(itemData, tracked)
   local normalized = namespace.ItemResolver.normalizeItemData(itemData)
   if not normalized then
@@ -248,20 +414,12 @@ function namespace.SetTrackedFromItemData(itemData, tracked)
   local characterKey = getCharacterKey()
 
   if tracked then
-    local bossName = nil
-    if normalized.encounterID and normalized.instanceID and isRaidInstance(normalized.instanceID) and type(EJ_GetEncounterInfo) == "function" then
-      bossName = EJ_GetEncounterInfo(normalized.encounterID)
-    end
-
     namespace.WishlistStore.setTracked(db, characterKey, normalized.itemID, true)
     namespace.WishlistStore.setItemMetadata(db, characterKey, normalized.itemID, {
-      itemName = normalized.itemName,
-      itemLink = normalized.itemLink,
-      sourceLabel = normalized.instanceName,
       encounterID = normalized.encounterID,
       instanceID = normalized.instanceID,
-      bossName = bossName,
       inventoryType = normalized.inventoryType,
+      selectedVariantRef = normalized.selectedVariantRef,
     })
     if normalized.instanceID then
       namespace.PrimeEncounterDataForInstance(normalized.instanceID)
@@ -446,15 +604,17 @@ local function buildTooltipFooter(groupingMode, item)
     return nil
   end
 
-  if type(item.sourceLabel) ~= "string" or item.sourceLabel == "" then
+  local sourceLabel = resolveInstanceName(item.instanceID)
+  if type(sourceLabel) ~= "string" or sourceLabel == "" then
     return nil
   end
 
-  if item.bossName and item.bossName ~= "" and isRaidInstance(item.instanceID) then
-    return namespace.GetText("DROPS_FROM_RAID", item.sourceLabel, item.bossName)
+  local bossName = resolveBossName(item.encounterID, item.instanceID)
+  if bossName and bossName ~= "" and isRaidInstance(item.instanceID) then
+    return namespace.GetText("DROPS_FROM_RAID", sourceLabel, bossName)
   end
 
-  return namespace.GetText("DROPS_FROM", item.sourceLabel)
+  return namespace.GetText("DROPS_FROM", sourceLabel)
 end
 
 function namespace.BuildTrackerGroups()
@@ -464,30 +624,26 @@ function namespace.BuildTrackerGroups()
   local groupingMode = getTrackerGroupingMode()
 
   for _, item in ipairs(trackedItems) do
+    local effectiveDisplayVariant = resolveEffectiveDisplayVariant(item, bestOwnedLinks)
     local key = namespace.ItemResolver.getWishlistKey({ itemID = item.itemID })
-    local itemName = item.itemName or GetItemInfo(item.itemID) or item.itemLink or ("Item " .. tostring(item.itemID))
+    local sourceLabel = resolveInstanceName(item.instanceID)
+    local itemName = getItemInfoName(effectiveDisplayVariant) or getItemInfoName(item.itemID) or ("Item " .. tostring(item.itemID))
     local group = namespace.SourceResolver.resolveGroup(groupingMode, {
       instanceID = item.instanceID,
-      instanceName = item.sourceLabel,
-      sourceLabel = item.sourceLabel,
+      instanceName = sourceLabel,
       inventoryType = item.inventoryType,
       slotLabel = getInventoryTypeLabel(item.inventoryType),
     }, namespace.GetText("OTHER"))
-    local sourceLabel = item.sourceLabel
     local raidSource = isRaidInstance(item.instanceID)
-    local bossName = raidSource and (item.bossName or resolveBossName(item.encounterID, item.instanceID)) or nil
+    local bossName = raidSource and resolveBossName(item.encounterID, item.instanceID) or nil
     local tooltipFooter = buildTooltipFooter(groupingMode, {
-      sourceLabel = sourceLabel,
-      bossName = bossName,
       instanceID = item.instanceID,
+      encounterID = item.encounterID,
     })
-    local bestOwnedLink = bestOwnedLinks[key]
-    local tooltipRef = namespace.ItemResolver.getTooltipRef({
-      itemLink = item.itemLink,
-      itemID = item.itemID,
-    })
-    local displayLink = bestOwnedLink or item.itemLink
+    local tooltipRef = effectiveDisplayVariant
+    local displayLink = effectiveDisplayVariant
     local bossRank = bossName and getEncounterRank(item.encounterID, item.instanceID) or nil
+    local itemTrack = getLocalizedItemTrack(effectiveDisplayVariant)
 
     table.insert(renderItems, {
       itemID = item.itemID,
@@ -498,6 +654,7 @@ function namespace.BuildTrackerGroups()
       instanceID = item.instanceID,
       isPossessed = namespace.state.possessed[key] == true,
       bestLootedItemLevel = item.bestLootedItemLevel,
+      itemTrack = itemTrack,
       bossName = bossName,
       bossRank = bossRank,
       tooltipRef = tooltipRef,
@@ -521,13 +678,13 @@ function namespace.BuildLootAlertRecord(itemID, playerName, itemLink)
   end
 
   local entry = getTrackedItemEntry(itemID)
-  if not entry or entry.tracked ~= true then
+  if not entry then
     return nil
   end
 
   return {
     itemID = itemID,
-    itemName = entry.itemName,
+    itemName = getItemInfoName(itemID),
     itemLink = itemLink,
     playerName = playerName,
   }
@@ -614,6 +771,7 @@ local function registerEvents()
   eventFrame:RegisterEvent("BANKFRAME_CLOSED")
   eventFrame:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
   eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+  eventFrame:RegisterEvent("TOOLTIP_DATA_UPDATE")
 end
 
 eventFrame:SetScript("OnEvent", function(_, event, ...)
@@ -666,6 +824,32 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "PLAYER_REGEN_ENABLED" then
     -- Player left combat - immediate refresh to show updates right away
     namespace.RefreshAllImmediate()
+    return
+  end
+
+  if event == "TOOLTIP_DATA_UPDATE" then
+    if not namespace.state.hasPendingItemTrackRefresh then
+      return
+    end
+
+    local pending = getPendingItemTrackRefreshes()
+    local cache = getItemTrackCache()
+    local hasRemaining = false
+
+    for itemRef, pendingState in pairs(pending) do
+      cache[itemRef] = nil
+      local itemTrack = getLocalizedItemTrack(itemRef)
+      if itemTrack then
+        pending[itemRef] = nil
+      elseif pendingState and pendingState.attempts < TRACK_INFO_REFRESH_MAX_ATTEMPTS then
+        hasRemaining = true
+      else
+        pending[itemRef] = nil
+      end
+    end
+
+    namespace.state.hasPendingItemTrackRefresh = hasRemaining and next(pending) ~= nil or false
+    namespace.RefreshAll()
     return
   end
 

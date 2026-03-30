@@ -102,7 +102,7 @@ The addon SHALL NOT open the Adventure Guide or Encounter Journal when the user 
 
 ### Requirement: Tracker rows show current possession and best looted item level separately
 
-The addon SHALL show a green tick for a tracked item only when the active character currently possesses any version of that item in equipped slots, bags, or bank when bank data is known. The addon SHALL append the highest remembered looted item level in parentheses when that value is known, even if the item is not currently possessed. In `Loot Source` mode, if the item's source is identified as a raid, the addon SHALL organize items hierarchically by boss: each boss appears as a gray section header followed by items belonging to that boss, sorted by encounter order within the raid. In `Equipment Slot` mode, the addon SHALL display items in a flat list within each slot group with no nested boss or source subheaders. Wishlist tracker row hover SHALL use a tooltip surface isolated from shared Blizzard tooltip state so hovering wishlist rows does not interfere with Blizzard tooltip flows elsewhere. The tracker SHALL render a fixed 5px vertical gap between adjacent top-level groups in the active grouping mode while keeping rows within the same top-level group, including raid boss headers and item rows, tightly stacked without that extra gap. When a best owned item link is available, the tracker row SHALL use that link for display styling instead of an older tracked journal link.
+The addon SHALL show a green tick for a tracked item only when the active character currently possesses any version of that item in equipped slots, bags, or bank when bank data is known. The addon SHALL append the highest remembered looted item level in parentheses when that value is known, even if the item is not currently possessed. When the effective display variant also exposes a localized item track and remembered item level is known, the tracker SHALL append the suffix as `(<ITEM LEVEL> <ITEM TRACK>)`; when only remembered item level is known, the suffix SHALL remain `(<ITEM LEVEL>)`; when remembered item level is unknown, the tracker SHALL append no item-level or item-track suffix. In `Loot Source` mode, if the item's source is identified as a raid, the addon SHALL organize items hierarchically by boss: each boss appears as a gray section header followed by items belonging to that boss, sorted by encounter order within the raid. In `Equipment Slot` mode, the addon SHALL display items in a flat list within each slot group with no nested boss or source subheaders. Wishlist tracker row hover SHALL use a tooltip surface isolated from shared Blizzard tooltip state so hovering wishlist rows does not interfere with Blizzard tooltip flows elsewhere. The tracker SHALL render a fixed 5px vertical gap between adjacent top-level groups in the active grouping mode while keeping rows within the same top-level group, including raid boss headers and item rows, tightly stacked without that extra gap. The tracker row's effective display variant for styling and track text SHALL prefer the best owned item link, then the persisted selected variant reference, then stable base-item fallback. If localized item-track data for the effective display variant is not yet available, the addon SHALL render the row without track text for that pass and SHALL issue a bounded follow-up refresh when the tooltip-data update path resolves the item track.
 
 #### Scenario: Tracked item is currently possessed
 
@@ -121,8 +121,38 @@ The addon SHALL show a green tick for a tracked item only when the active charac
 
 #### Scenario: Best owned version controls row styling
 
-- **WHEN** the character owns a higher-quality or otherwise better version of a tracked item than the originally tracked journal link
+- **WHEN** the character owns a higher-quality or otherwise better version of a tracked item than the originally tracked journal variant
 - **THEN** the tracker row uses the best owned item link for display styling so row quality color matches the best known owned version
+
+#### Scenario: Selected variant controls unowned row styling
+
+- **WHEN** the character does not currently own a tracked item
+- **AND** the wishlist entry has a persisted selected variant reference
+- **THEN** the tracker row uses that selected variant as the effective display variant for styling and track derivation
+
+#### Scenario: Item level and track are shown together
+
+- **WHEN** the addon knows the highest remembered looted item level for a tracked item
+- **AND** the effective display variant resolves a localized item track label
+- **THEN** the objective tracker row appends the suffix as `(<ITEM LEVEL> <ITEM TRACK>)`
+
+#### Scenario: Item level without track keeps the legacy suffix form
+
+- **WHEN** the addon knows the highest remembered looted item level for a tracked item
+- **AND** the effective display variant does not resolve a localized item track label
+- **THEN** the objective tracker row appends the suffix as `(<ITEM LEVEL>)`
+
+#### Scenario: Missing item level suppresses the full suffix
+
+- **WHEN** the addon does not know the highest remembered looted item level for a tracked item
+- **THEN** the objective tracker row appends no item-level or item-track suffix
+
+#### Scenario: Track data refresh updates the row after initial fallback
+
+- **WHEN** the tracker first renders a tracked item row without track text because localized item-track data is not yet available for the effective display variant
+- **AND** the tooltip-data update path later resolves that variant's localized item track label
+- **THEN** the addon issues a bounded follow-up refresh for the affected row or tracker section
+- **AND** the refreshed row appends the localized track label when remembered item level is known
 
 #### Scenario: Hover tracked item row shows isolated Blizzard-native tooltip
 

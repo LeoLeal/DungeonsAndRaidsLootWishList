@@ -1,5 +1,13 @@
 local WishlistStore = {}
 
+local LEGACY_LOCALIZED_FIELDS = {
+  tracked = true,
+  itemName = true,
+  itemLink = true,
+  sourceLabel = true,
+  bossName = true,
+}
+
 local function normalizeItemId(itemId)
   if itemId == nil then
     return nil
@@ -84,29 +92,16 @@ function WishlistStore.getExistingItemEntry(db, characterKey, itemId)
 end
 
 function WishlistStore.setTracked(db, characterKey, itemId, tracked)
-  local entry = WishlistStore.getItemEntry(db, characterKey, itemId)
-  entry.tracked = tracked and true or false
-end
+  if tracked then
+    return WishlistStore.getItemEntry(db, characterKey, itemId)
+  end
 
-function WishlistStore.setSourceLabel(db, characterKey, itemId, sourceLabel)
-  local entry = WishlistStore.getItemEntry(db, characterKey, itemId)
-  entry.sourceLabel = sourceLabel
+  WishlistStore.removeItem(db, characterKey, itemId)
+  return nil
 end
 
 function WishlistStore.setItemMetadata(db, characterKey, itemId, metadata)
   local entry = WishlistStore.getItemEntry(db, characterKey, itemId)
-
-  if metadata.itemName ~= nil then
-    entry.itemName = metadata.itemName
-  end
-
-  if metadata.itemLink ~= nil then
-    entry.itemLink = metadata.itemLink
-  end
-
-  if metadata.sourceLabel ~= nil then
-    entry.sourceLabel = metadata.sourceLabel
-  end
 
   if metadata.encounterID ~= nil then
     entry.encounterID = metadata.encounterID
@@ -116,12 +111,16 @@ function WishlistStore.setItemMetadata(db, characterKey, itemId, metadata)
     entry.instanceID = metadata.instanceID
   end
 
-  if metadata.bossName ~= nil then
-    entry.bossName = metadata.bossName
-  end
-
   if metadata.inventoryType ~= nil then
     entry.inventoryType = metadata.inventoryType
+  end
+
+  if metadata.bestLootedItemLevel ~= nil then
+    entry.bestLootedItemLevel = metadata.bestLootedItemLevel
+  end
+
+  if metadata.selectedVariantRef ~= nil then
+    entry.selectedVariantRef = metadata.selectedVariantRef
   end
 
   if entry.inventoryType == nil then
@@ -129,14 +128,9 @@ function WishlistStore.setItemMetadata(db, characterKey, itemId, metadata)
   end
 end
 
-function WishlistStore.getSourceLabel(db, characterKey, itemId)
-  local entry = WishlistStore.getExistingItemEntry(db, characterKey, itemId)
-  return entry and entry.sourceLabel or nil
-end
-
 function WishlistStore.isTracked(db, characterKey, itemId)
   local entry = WishlistStore.getExistingItemEntry(db, characterKey, itemId)
-  return entry ~= nil and entry.tracked == true
+  return entry ~= nil
 end
 
 function WishlistStore.updateBestLootedItemLevel(db, characterKey, itemId, itemLevel)
@@ -167,9 +161,7 @@ function WishlistStore.removeItem(db, characterKey, itemId)
     return
   end
 
-  character.items[itemKey] = {
-    tracked = false,
-  }
+  character.items[itemKey] = nil
 end
 
 function WishlistStore.getGroupingMode(db, characterKey)
@@ -210,18 +202,14 @@ function WishlistStore.getTrackedItems(db, characterKey)
   local trackedItems = {}
 
   for itemKey, entry in pairs(character.items) do
-    if entry.tracked == true then
+    if type(entry) == "table" then
       table.insert(trackedItems, {
         itemID = tonumber(itemKey) or itemKey,
-        tracked = true,
         bestLootedItemLevel = entry.bestLootedItemLevel,
-        sourceLabel = entry.sourceLabel,
-        itemName = entry.itemName,
-        itemLink = entry.itemLink,
         encounterID = entry.encounterID,
         instanceID = entry.instanceID,
-        bossName = entry.bossName,
         inventoryType = entry.inventoryType,
+        selectedVariantRef = entry.selectedVariantRef,
       })
     end
   end
@@ -238,13 +226,11 @@ function WishlistStore.performBackfill(db, characterKey, namespace)
   local itemsPending = {}
 
   for itemID, entry in pairs(character.items) do
-    local needsRaidBossName = entry.instanceID and namespace and namespace.IsRaidInstance and namespace.IsRaidInstance(entry.instanceID)
-    if entry.tracked and (not entry.encounterID or not entry.instanceID or not entry.sourceLabel or not entry.inventoryType or
-        (needsRaidBossName and not entry.bossName)) then
+    if type(entry) == "table" and (not entry.encounterID or not entry.instanceID or not entry.inventoryType) then
       itemsPending[tonumber(itemID)] = entry
     end
 
-    if entry.tracked and not entry.inventoryType then
+    if type(entry) == "table" and not entry.inventoryType then
       entry.inventoryType = resolveInventoryType(tonumber(itemID))
     end
   end
@@ -284,10 +270,6 @@ function WishlistStore.performBackfill(db, characterKey, namespace)
               if litemID and itemsPending[litemID] then
                 itemsPending[litemID].encounterID = encounterID
                 itemsPending[litemID].instanceID = instanceID
-                itemsPending[litemID].sourceLabel = itemsPending[litemID].sourceLabel or name
-                if isRaid == 1 then
-                  itemsPending[litemID].bossName = itemsPending[litemID].bossName or ename
-                end
                 itemsPending[litemID].inventoryType = itemsPending[litemID].inventoryType or resolveInventoryType(litemID)
               end
             end
@@ -307,7 +289,7 @@ function WishlistStore.repairTrackedMetadata(db, characterKey, namespace)
   for itemID, entry in pairs(character.items) do
     local numericItemID = tonumber(itemID)
 
-    if entry.tracked then
+    if type(entry) == "table" then
       if not entry.inventoryType then
         local inventoryType = resolveInventoryType(numericItemID)
         if inventoryType then
@@ -316,9 +298,11 @@ function WishlistStore.repairTrackedMetadata(db, characterKey, namespace)
         end
       end
 
-      if entry.instanceID and entry.bossName and namespace and namespace.IsRaidInstance and not namespace.IsRaidInstance(entry.instanceID) then
-        entry.bossName = nil
-        changed = true
+      for fieldName in pairs(LEGACY_LOCALIZED_FIELDS) do
+        if entry[fieldName] ~= nil then
+          entry[fieldName] = nil
+          changed = true
+        end
       end
     end
   end
@@ -326,18 +310,91 @@ function WishlistStore.repairTrackedMetadata(db, characterKey, namespace)
   return changed
 end
 
+local function normalizeSelectedVariantRef(namespace, itemLink)
+  if type(itemLink) ~= "string" or itemLink == "" then
+    return nil
+  end
+
+  if namespace and namespace.ItemResolver and type(namespace.ItemResolver.getVariantRef) == "function" then
+    return namespace.ItemResolver.getVariantRef(itemLink)
+  end
+
+  return itemLink:match("|H([^|]+)|h") or (itemLink:match("^item:") and itemLink) or nil
+end
+
+local function migrateEntry(namespace, itemId, entry)
+  if type(entry) ~= "table" then
+    return nil
+  end
+
+  if entry.tracked ~= nil and entry.tracked ~= true then
+    return nil
+  end
+
+  local migrated = {
+    bestLootedItemLevel = entry.bestLootedItemLevel,
+    instanceID = entry.instanceID,
+    encounterID = entry.encounterID,
+    inventoryType = entry.inventoryType,
+    selectedVariantRef = entry.selectedVariantRef,
+  }
+
+  if migrated.selectedVariantRef == nil then
+    migrated.selectedVariantRef = normalizeSelectedVariantRef(namespace, entry.itemLink)
+  else
+    migrated.selectedVariantRef = normalizeSelectedVariantRef(namespace, migrated.selectedVariantRef)
+  end
+
+  if migrated.inventoryType == nil then
+    migrated.inventoryType = resolveInventoryType(tonumber(itemId))
+  end
+
+  if next(migrated) == nil then
+    return {}
+  end
+
+  return migrated
+end
+
+local function migrateCharacterItems(db, characterKey, namespace)
+  local character = WishlistStore.ensureCharacter(db, characterKey)
+  local migratedItems = {}
+  local changed = false
+
+  for itemKey, entry in pairs(character.items or {}) do
+    local migratedEntry = migrateEntry(namespace, itemKey, entry)
+    if migratedEntry ~= nil then
+      migratedItems[itemKey] = migratedEntry
+
+      if migratedEntry ~= entry then
+        changed = true
+      end
+    else
+      changed = true
+    end
+  end
+
+  if changed then
+    character.items = migratedItems
+  end
+
+  return changed
+end
+
 function WishlistStore.runMigration(db, namespace)
-  if db.version == 3 then return end
+  if db.version == 4 then return end
 
   for characterKey, _ in pairs(db.characters or {}) do
     WishlistStore.ensureCharacter(db, characterKey)
   end
 
   for characterKey, _ in pairs(db.characters or {}) do
+    migrateCharacterItems(db, characterKey, namespace)
     WishlistStore.performBackfill(db, characterKey, namespace)
+    WishlistStore.repairTrackedMetadata(db, characterKey, namespace)
   end
 
-  db.version = 3
+  db.version = 4
 end
 
 local _, namespace = ...

@@ -29,7 +29,11 @@ end
 local function buildDisplayText(item, skipBoss)
   local text = item.itemName
   if item.bestLootedItemLevel ~= nil then
-    text = string.format("%s (%s)", text, tostring(item.bestLootedItemLevel))
+    local suffix = tostring(item.bestLootedItemLevel)
+    if type(item.itemTrack) == "string" and item.itemTrack ~= "" then
+      suffix = string.format("%s %s", suffix, item.itemTrack)
+    end
+    text = string.format("%s (%s)", text, suffix)
   end
 
   if not skipBoss and item.bossName ~= nil and item.bossName ~= "" then
@@ -124,6 +128,7 @@ function TrackerModel.buildGroups(items, options)
             displayText = buildDisplayText(item, true), -- skip inline boss name
             showTick = item.isPossessed == true,
             bestLootedItemLevel = item.bestLootedItemLevel,
+            itemTrack = item.itemTrack,
             tooltipRef = item.tooltipRef,
             displayLink = item.displayLink,
             sourceLabel = item.sourceLabel,
@@ -142,6 +147,7 @@ function TrackerModel.buildGroups(items, options)
           displayText = buildDisplayText(item, true),
           showTick = item.isPossessed == true,
           bestLootedItemLevel = item.bestLootedItemLevel,
+          itemTrack = item.itemTrack,
           tooltipRef = item.tooltipRef,
           displayLink = item.displayLink,
           sourceLabel = item.sourceLabel,

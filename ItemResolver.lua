@@ -1,5 +1,22 @@
 local ItemResolver = {}
 
+local function trimHyperlinkPayload(itemRef)
+  if type(itemRef) ~= "string" then
+    return nil
+  end
+
+  local hyperlink = itemRef:match("|H([^|]+)|h")
+  if type(hyperlink) == "string" and hyperlink ~= "" then
+    return hyperlink
+  end
+
+  if itemRef:match("^item:") then
+    return itemRef
+  end
+
+  return nil
+end
+
 function ItemResolver.getWishlistKey(itemData)
   if itemData == nil then
     return nil
@@ -14,16 +31,21 @@ function ItemResolver.getWishlistKey(itemData)
 end
 
 function ItemResolver.getItemIdFromLink(itemLink)
-  if type(itemLink) ~= "string" then
+  local itemRef = trimHyperlinkPayload(itemLink)
+  if type(itemRef) ~= "string" then
     return nil
   end
 
-  local itemId = string.match(itemLink, "item:(%d+)")
+  local itemId = string.match(itemRef, "item:(%d+)")
   if itemId == nil then
     return nil
   end
 
   return tonumber(itemId)
+end
+
+function ItemResolver.getVariantRef(itemRef)
+  return trimHyperlinkPayload(itemRef)
 end
 
 function ItemResolver.normalizeItemData(itemData)
@@ -46,6 +68,7 @@ function ItemResolver.normalizeItemData(itemData)
     itemID = itemId,
     wishlistKey = ItemResolver.getWishlistKey({ itemID = itemId }),
     itemLink = itemData.itemLink,
+    selectedVariantRef = ItemResolver.getVariantRef(itemData.selectedVariantRef or itemData.itemLink),
     itemName = itemData.itemName,
     itemLevel = itemData.itemLevel,
     instanceName = itemData.instanceName,
@@ -60,8 +83,14 @@ function ItemResolver.getTooltipRef(item)
     return nil
   end
 
-  if type(item.itemLink) == "string" and item.itemLink ~= "" then
-    return item.itemLink
+  local selectedVariantRef = ItemResolver.getVariantRef(item.selectedVariantRef)
+  if selectedVariantRef then
+    return selectedVariantRef
+  end
+
+  local itemLink = ItemResolver.getVariantRef(item.itemLink)
+  if itemLink then
+    return itemLink
   end
 
   local itemId = item.itemID or item.itemId or item.id
