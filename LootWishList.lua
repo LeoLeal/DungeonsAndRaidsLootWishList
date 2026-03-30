@@ -1043,10 +1043,18 @@ SlashCmdList["LWTESTALERT"] = function()
   local randomIndex = math.random(1, #trackedItems)
   local testItem = trackedItems[randomIndex]
   local itemID = testItem.itemID
-  local itemLink = testItem.itemLink or
-      ("|Hitem:" .. itemID .. "::::::::70:::::|h[" .. (testItem.itemName or "Test Item") .. "]|h")
+  local itemLink = namespace.ResolveEffectiveDisplayVariant(testItem)
+  if type(GetItemInfo) == "function" then
+    itemLink = select(2, GetItemInfo(itemLink)) or select(2, GetItemInfo(itemID)) or itemLink
+  end
 
-  namespace.ShowLootDialog(randomName, itemLink)
+  local alertRecord = namespace.BuildLootAlertRecord(itemID, randomName, itemLink)
+  if not alertRecord then
+    print("LootWishList: Unable to build a valid test alert record for item " .. tostring(itemID))
+    return
+  end
+
+  namespace.ShowLootDialogFromRecord(alertRecord)
   print("LootWishList: Triggered test alert for " .. randomName .. " looting " .. itemLink)
 end
 
