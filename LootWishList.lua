@@ -13,9 +13,9 @@ namespace.eventFrame = eventFrame
 
 local RECENT_SELF_LOOT_TTL_SECONDS = 3
 local TRACK_INFO_REFRESH_MAX_ATTEMPTS = 3
-local TOOLTIP_SOURCE_ATLAS_SIZE = 24
-local TOOLTIP_SOURCE_DUNGEON_ATLAS = "Dungeon"
-local TOOLTIP_SOURCE_RAID_ATLAS = "Raid"
+local TOOLTIP_SOURCE_ATLAS_SIZE = 18
+local TOOLTIP_SOURCE_DUNGEON_ATLAS = "questlog-questtypeicon-dungeon"
+local TOOLTIP_SOURCE_RAID_ATLAS = "questlog-questtypeicon-raid"
 
 local function getCharacterKey()
   local name = UnitName("player") or "Unknown"
@@ -485,11 +485,6 @@ function namespace.RefreshPossessionState()
     if hasInitializedPossession and possessed[key] and not previousPossessed[key] then
       namespace.MarkRecentSelfLoot(item.itemID)
     end
-
-    if highestLevels[key] then
-      namespace.WishlistStore.updateBestLootedItemLevel(getCurrentDb(), getCharacterKey(), item.itemID,
-        highestLevels[key])
-    end
   end
 
   namespace.state.hasInitializedPossession = true
@@ -660,7 +655,6 @@ function namespace.BuildTrackerGroups()
     local tooltipRef = effectiveDisplayVariant
     local displayLink = effectiveDisplayVariant
     local bossRank = bossName and getEncounterRank(item.encounterID, item.instanceID) or nil
-    local itemTrack = getLocalizedItemTrack(effectiveDisplayVariant)
 
     table.insert(renderItems, {
       itemID = item.itemID,
@@ -670,8 +664,6 @@ function namespace.BuildTrackerGroups()
       groupSortIndex = group.sortIndex,
       instanceID = item.instanceID,
       isPossessed = namespace.state.possessed[key] == true,
-      bestLootedItemLevel = item.bestLootedItemLevel,
-      itemTrack = itemTrack,
       bossName = bossName,
       bossRank = bossRank,
       tooltipRef = tooltipRef,

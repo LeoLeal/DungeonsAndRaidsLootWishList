@@ -20,7 +20,7 @@ async function loadLuaModule(relativePath) {
   }
 }
 
-test('wishlist store persists normalized tracked items and best looted item levels per character', async () => {
+test('wishlist store persists normalized tracked items without best looted item levels per character', async () => {
   const factory = new LuaFactory()
   const lua = await factory.createEngine()
   const source = fs.readFileSync(path.join(process.cwd(), 'WishlistStore.lua'), 'utf8').replace(/return WishlistStore\s*$/, '')
@@ -35,17 +35,17 @@ test('wishlist store persists normalized tracked items and best looted item leve
         inventoryType = 'INVTYPE_WEAPON',
         selectedVariantRef = 'item:19019::::::::70::5:1:3524::::::'
       })
-      WishlistStore.updateBestLootedItemLevel(db, 'Player-Realm', 19019, 262)
       local items = WishlistStore.getTrackedItems(db, 'Player-Realm')
       local entry = WishlistStore.getExistingItemEntry(db, 'Player-Realm', 19019)
       return {
         tracked = WishlistStore.isTracked(db, 'Player-Realm', 19019),
-        best = WishlistStore.getBestLootedItemLevel(db, 'Player-Realm', 19019),
         count = #items,
         encounterID = items[1].encounterID,
         instanceID = items[1].instanceID,
         inventoryType = items[1].inventoryType,
         selectedVariantRef = items[1].selectedVariantRef,
+        itemBestLootedItemLevel = items[1].bestLootedItemLevel,
+        savedBestLootedItemLevel = entry.bestLootedItemLevel,
         savedItemName = entry.itemName,
         savedItemLink = entry.itemLink,
         savedSourceLabel = entry.sourceLabel,
@@ -53,12 +53,13 @@ test('wishlist store persists normalized tracked items and best looted item leve
     `)
 
     assert.equal(result.tracked, true)
-    assert.equal(result.best, 262)
     assert.equal(result.count, 1)
     assert.equal(result.encounterID, 11502)
     assert.equal(result.instanceID, 469)
     assert.equal(result.inventoryType, 'INVTYPE_WEAPON')
     assert.equal(result.selectedVariantRef, 'item:19019::::::::70::5:1:3524::::::')
+    assert.equal(result.itemBestLootedItemLevel, undefined)
+    assert.equal(result.savedBestLootedItemLevel, undefined)
     assert.equal(result.savedItemName, undefined)
     assert.equal(result.savedItemLink, undefined)
     assert.equal(result.savedSourceLabel, undefined)
@@ -123,7 +124,7 @@ test('wishlist store persists grouping mode and collapse state separately per mo
   }
 })
 
-test('wishlist store repairs missing inventory types and strips legacy localized fields', async () => {
+test('wishlist store repairs missing inventory types and strips legacy localized fields without changing version', async () => {
   const factory = new LuaFactory()
   const lua = await factory.createEngine()
   const source = fs.readFileSync(path.join(process.cwd(), 'WishlistStore.lua'), 'utf8').replace(/return WishlistStore\s*$/, '')
@@ -137,12 +138,14 @@ test('wishlist store repairs missing inventory types and strips legacy localized
       ${source}
 
       local db = {
+        version = 4,
         characters = {
           ['Player-Realm'] = {
             items = {
               ['19019'] = {
                 tracked = true,
                 instanceID = 42,
+                bestLootedItemLevel = 278,
                 itemName = 'Legacy Name',
                 sourceLabel = 'Legacy Source'
               }
@@ -159,17 +162,21 @@ test('wishlist store repairs missing inventory types and strips legacy localized
 
       local entry = WishlistStore.getTrackedItems(db, 'Player-Realm')[1]
       return {
+        version = db.version,
         changed = changed,
         inventoryType = entry.inventoryType,
         selectedVariantRef = entry.selectedVariantRef,
+        rawBestLootedItemLevel = db.characters['Player-Realm'].items['19019'].bestLootedItemLevel,
         rawItemName = db.characters['Player-Realm'].items['19019'].itemName,
         rawSourceLabel = db.characters['Player-Realm'].items['19019'].sourceLabel,
       }
     `)
 
+    assert.equal(result.version, 4)
     assert.equal(result.changed, true)
     assert.equal(result.inventoryType, 'INVTYPE_HEAD')
     assert.equal(result.selectedVariantRef, undefined)
+    assert.equal(result.rawBestLootedItemLevel, undefined)
     assert.equal(result.rawItemName, undefined)
     assert.equal(result.rawSourceLabel, undefined)
   } finally {
@@ -228,6 +235,7 @@ test('wishlist store migrates legacy entries to normalized storage idempotently'
         trackedCount = #WishlistStore.getTrackedItems(db, 'Player-Realm'),
         hasTrackedEntry = entry ~= nil,
         selectedVariantRef = entry and entry.selectedVariantRef or nil,
+        bestLootedItemLevel = entry and entry.bestLootedItemLevel or nil,
         itemName = entry and entry.itemName or nil,
         sourceLabel = entry and entry.sourceLabel or nil,
         removedTombstone = WishlistStore.getExistingItemEntry(db, 'Player-Realm', 17182),
@@ -238,6 +246,7 @@ test('wishlist store migrates legacy entries to normalized storage idempotently'
     assert.equal(result.trackedCount, 1)
     assert.equal(result.hasTrackedEntry, true)
     assert.equal(result.selectedVariantRef, 'item:19019::::::::70::5:1:3524::::::')
+    assert.equal(result.bestLootedItemLevel, undefined)
     assert.equal(result.itemName, undefined)
     assert.equal(result.sourceLabel, undefined)
     assert.equal(result.removedTombstone, undefined)
@@ -333,7 +342,7 @@ test('source resolver prefers the current journal instance name before falling b
   }
 })
 
-test('tracker model groups rows by source and keeps best ilvl separate from possession', async () => {
+test('tracker model groups rows by source and shows only item identity plus possession state', async () => {
   const { module: trackerModel, close } = await loadLuaModule('TrackerModel.lua')
 
   try {
@@ -347,7 +356,7 @@ test('tracker model groups rows by source and keeps best ilvl separate from poss
     assert.equal(grouped[0].key, 'source:instance:1')
     assert.equal(grouped[0].mode, 'source')
     assert.equal(grouped[0].label, 'Operation: Floodgate')
-    assert.equal(grouped[0].items[0].displayText, 'Stormlash Dagger (262 Champion)')
+    assert.equal(grouped[0].items[0].displayText, 'Stormlash Dagger')
     assert.equal(grouped[0].items[0].showTick, false)
     assert.equal(grouped[0].items[1].displayText, 'Circuit Breaker')
     assert.equal(grouped[0].items[1].showTick, true)
@@ -527,7 +536,6 @@ test('set tracked from item data works before raid helpers are defined later in 
           setTracked = function(_, _, itemID) trackedItemId = itemID end,
           setItemMetadata = function(_, _, _, metadata) trackedMetadata = metadata end,
           removeItem = function() end,
-          updateBestLootedItemLevel = function() end,
           runMigration = function() end,
           repairTrackedMetadata = function() end,
         },
@@ -722,7 +730,7 @@ test('slot mode tooltip footer uses a dungeon atlas without localized drops text
       return capturedItems[1].tooltipFooter
     `)
 
-    assert.equal(result, '|A:Dungeon:16:16|a The Deadmines')
+    assert.equal(result, '|A:Dungeon:24:24|aThe Deadmines')
     assert.equal(result.includes('DROPS_FROM'), false)
     assert.equal(result.includes('Drops from:'), false)
   } finally {
@@ -837,7 +845,7 @@ test('slot mode tooltip footer uses a raid atlas and boss name without localized
       return capturedItems[1].tooltipFooter
     `)
 
-    assert.equal(result, '|A:Raid:16:16|a Blackwing Lair - Nefarian')
+    assert.equal(result, '|A:Raid:24:24|aBlackwing Lair - Nefarian')
     assert.equal(result.includes('DROPS_FROM'), false)
     assert.equal(result.includes('Drops from:'), false)
   } finally {
@@ -1072,6 +1080,107 @@ test('loot wishlist resolves effective display variant by owned link, then selec
   }
 })
 
+test('self-loot possession refresh marks recent self loot without writing best looted item level', async () => {
+  const factory = new LuaFactory()
+  const lua = await factory.createEngine()
+  const source = fs.readFileSync(path.join(process.cwd(), 'LootWishList.lua'), 'utf8')
+    .replace(/--@do-not-package@[\s\S]*--@end-do-not-package@\s*$/, '')
+
+  try {
+    const result = await lua.doString(`
+      local function newFrame()
+        local frame = {}
+        function frame:RegisterEvent() end
+        function frame:SetScript() end
+        function frame:Hide() end
+        function frame:Show() end
+        return frame
+      end
+
+      function CreateFrame()
+        return newFrame()
+      end
+
+      function UnitName() return 'Player' end
+      function GetRealmName() return 'Realm' end
+      function GetTime() return 0 end
+      function GetDetailedItemLevelInfo(itemLink)
+        if itemLink then
+          return 262
+        end
+        return nil
+      end
+      function GetInventoryItemLink(unit, slot)
+        if unit == 'player' and slot == 1 then
+          return '|Hitem:19019::::::::70::6:1:3524::::::|h[Owned]|h'
+        end
+        return nil
+      end
+
+      INVSLOT_FIRST_EQUIPPED = 1
+      INVSLOT_LAST_EQUIPPED = 1
+
+      local updateCalls = 0
+      local namespace = {
+        db = {},
+        state = {
+          possessed = {},
+          bestOwnedLinks = {},
+          hasInitializedPossession = true,
+        },
+        ItemResolver = {
+          getWishlistKey = function(item)
+            return 'item:' .. tostring(item.itemID)
+          end,
+          getItemIdFromLink = function(itemLink)
+            if type(itemLink) == 'string' and string.find(itemLink, 'item:19019', 1, true) then
+              return 19019
+            end
+            return nil
+          end,
+          getVariantRef = function(itemRef)
+            return itemRef and (itemRef:match('|H([^|]+)|h') or itemRef) or nil
+          end,
+          getTooltipRef = function(item)
+            return item.selectedVariantRef or ('item:' .. tostring(item.itemID))
+          end,
+        },
+        WishlistStore = {
+          getTrackedItems = function()
+            return {
+              { itemID = 19019, selectedVariantRef = 'item:19019::::::::70::5:1:3524::::::' },
+            }
+          end,
+          getGroupingMode = function() return 'source' end,
+        },
+        Locales = {
+          getString = function(_, _, key)
+            return key
+          end,
+        },
+      }
+
+      (function(...)
+        ${source}
+      end)('Addon', namespace)
+
+      namespace.RefreshPossessionState()
+
+      return {
+        wasRecentSelfLoot = namespace.WasRecentSelfLoot(19019),
+        isPossessed = namespace.state.possessed['item:19019'],
+        bestOwnedLink = namespace.state.bestOwnedLinks['item:19019'],
+      }
+    `)
+
+    assert.equal(result.wasRecentSelfLoot, true)
+    assert.equal(result.isPossessed, true)
+    assert.equal(result.bestOwnedLink, '|Hitem:19019::::::::70::6:1:3524::::::|h[Owned]|h')
+  } finally {
+    lua.global.close()
+  }
+})
+
 test('loot wishlist extracts localized item track from structured tooltip data', async () => {
   const factory = new LuaFactory()
   const lua = await factory.createEngine()
@@ -1161,7 +1270,7 @@ test('loot wishlist trims prefixed upgrade tooltip text down to the track label'
   }
 })
 
-test('loot wishlist tracker display text uses the trimmed track label', async () => {
+test('loot wishlist tracker display data omits the old suffix metadata', async () => {
   const factory = new LuaFactory()
   const lua = await factory.createEngine()
   const source = fs.readFileSync(path.join(process.cwd(), 'LootWishList.lua'), 'utf8')
@@ -1230,7 +1339,6 @@ test('loot wishlist tracker display text uses the trimmed track label', async ()
               {
                 itemID = 19019,
                 selectedVariantRef = 'item:19019::::::::70::5:1:3524::::::',
-                bestLootedItemLevel = 262,
                 instanceID = 1,
               },
             }
@@ -1265,8 +1373,192 @@ test('loot wishlist tracker display text uses the trimmed track label', async ()
       }
     `)
 
-    assert.equal(result.itemTrack, 'Champion')
-    assert.equal(`${result.bestLootedItemLevel} ${result.itemTrack}`, '262 Champion')
+    assert.equal(result.itemTrack, undefined)
+    assert.equal(result.bestLootedItemLevel, undefined)
+  } finally {
+    lua.global.close()
+  }
+})
+
+test('tooltip compare suppresses comparison panes for possessed rows', async () => {
+  const factory = new LuaFactory()
+  const lua = await factory.createEngine()
+  const source = fs.readFileSync(path.join(process.cwd(), 'TooltipCompare.lua'), 'utf8')
+    .replace(/return TooltipCompare\s*$/, '')
+
+  try {
+    const result = await lua.doString(`
+      UIParent = {}
+      EQUIPPED = 'Equipped'
+      NORMAL_FONT_COLOR = { GetRGB = function() return 1, 1, 1 end }
+
+      local function createTexture()
+        return {
+          SetAllPoints = function() end,
+          SetAtlas = function() end,
+        }
+      end
+
+      local function createFontString()
+        local fontString = {}
+        function fontString:SetPoint() end
+        function fontString:SetText(text)
+          self.text = text
+        end
+        function fontString:SetTextColor() end
+        function fontString:GetStringWidth()
+          return 60
+        end
+        return fontString
+      end
+
+      function CreateFrame(_, name)
+        local frame = { hidden = false, width = 100 }
+        function frame:SetFrameStrata() end
+        function frame:SetClampedToScreen() end
+        function frame:SetFrameLevel() end
+        function frame:GetFrameLevel() return 1 end
+        function frame:SetPoint(...) self.point = { ... } end
+        function frame:ClearAllPoints() self.point = nil end
+        function frame:SetSize(width, height) self.width = width self.height = height end
+        function frame:SetWidth(width) self.width = width end
+        function frame:Hide() self.hidden = true end
+        function frame:Show() self.hidden = false end
+        function frame:IsShown() return not self.hidden end
+        function frame:CreateTexture() return createTexture() end
+        function frame:CreateFontString() return createFontString() end
+        function frame:SetOwner() end
+        function frame:SetHyperlink(link) self.hyperlink = link end
+        function frame:GetWidth() return self.width end
+        function frame:GetLeft() return 300 end
+        function frame:GetRight() return 500 end
+        function frame:GetPoint() return 'TOPRIGHT', UIParent, 'TOPLEFT', -4, 0 end
+        if name then
+          _G[name] = frame
+        end
+        return frame
+      end
+
+      local comparisonCalls = 0
+      C_TooltipComparison = {
+        GetItemComparisonInfo = function()
+          comparisonCalls = comparisonCalls + 1
+          return { item = { hyperlink = 'item:18832' } }
+        end,
+      }
+
+      ${source}
+
+      local tooltip = CreateFrame('GameTooltip')
+      function tooltip:GetPrimaryTooltipData()
+        return { hyperlink = 'item:19019' }
+      end
+
+      TooltipCompare.showComparison(tooltip, { isPossessed = true })
+
+      return {
+        comparisonCalls = comparisonCalls,
+        compareHidden = LootWishListCompareTooltip1.hidden,
+      }
+    `)
+
+    assert.equal(result.comparisonCalls, 0)
+    assert.equal(result.compareHidden, true)
+  } finally {
+    lua.global.close()
+  }
+})
+
+test('tooltip compare keeps comparison panes for unowned rows using the real tooltip ref', async () => {
+  const factory = new LuaFactory()
+  const lua = await factory.createEngine()
+  const source = fs.readFileSync(path.join(process.cwd(), 'TooltipCompare.lua'), 'utf8')
+    .replace(/return TooltipCompare\s*$/, '')
+
+  try {
+    const result = await lua.doString(`
+      UIParent = {}
+      EQUIPPED = 'Equipped'
+      NORMAL_FONT_COLOR = { GetRGB = function() return 1, 1, 1 end }
+      function GetScreenWidth() return 1920 end
+
+      local function createTexture()
+        return {
+          SetAllPoints = function() end,
+          SetAtlas = function() end,
+        }
+      end
+
+      local function createFontString()
+        local fontString = {}
+        function fontString:SetPoint() end
+        function fontString:SetText(text)
+          self.text = text
+        end
+        function fontString:SetTextColor() end
+        function fontString:GetStringWidth()
+          return 60
+        end
+        return fontString
+      end
+
+      function CreateFrame(_, name)
+        local frame = { hidden = false, width = 100 }
+        function frame:SetFrameStrata() end
+        function frame:SetClampedToScreen() end
+        function frame:SetFrameLevel() end
+        function frame:GetFrameLevel() return 1 end
+        function frame:SetPoint(...) self.point = { ... } end
+        function frame:ClearAllPoints() self.point = nil end
+        function frame:SetSize(width, height) self.width = width self.height = height end
+        function frame:SetWidth(width) self.width = width end
+        function frame:Hide() self.hidden = true end
+        function frame:Show() self.hidden = false end
+        function frame:IsShown() return not self.hidden end
+        function frame:CreateTexture() return createTexture() end
+        function frame:CreateFontString() return createFontString() end
+        function frame:SetOwner() end
+        function frame:SetHyperlink(link) self.hyperlink = link end
+        function frame:GetWidth() return self.width end
+        function frame:GetLeft() return 300 end
+        function frame:GetRight() return 500 end
+        function frame:GetPoint() return 'TOPRIGHT', UIParent, 'TOPLEFT', -4, 0 end
+        if name then
+          _G[name] = frame
+        end
+        return frame
+      end
+
+      local comparisonCalls = 0
+      C_TooltipComparison = {
+        GetItemComparisonInfo = function(item)
+          comparisonCalls = comparisonCalls + 1
+          return { item = { hyperlink = item.hyperlink } }
+        end,
+      }
+
+      ${source}
+
+      local tooltip = CreateFrame('GameTooltip')
+      function tooltip:GetPrimaryTooltipData()
+        return { hyperlink = 'item:19019::::::::70::5:1:3524::::::' }
+      end
+
+      TooltipCompare.showComparison(tooltip, {
+        isPossessed = false,
+        GetLeft = function() return 100 end,
+      })
+
+      return {
+        comparisonCalls = comparisonCalls,
+        compareHidden = LootWishListCompareTooltip1.hidden,
+        compareHyperlink = LootWishListCompareTooltip1.hyperlink,
+      }
+    `)
+
+    assert.equal(result.comparisonCalls, 1)
+    assert.equal(result.compareHidden, false)
+    assert.equal(result.compareHyperlink, 'item:19019::::::::70::5:1:3524::::::')
   } finally {
     lua.global.close()
   }

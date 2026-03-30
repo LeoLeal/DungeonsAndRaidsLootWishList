@@ -237,6 +237,10 @@ function TooltipCompare.showComparison(tooltip, anchorFrame)
 
   hideCompareTooltips()
 
+  if anchorFrame and anchorFrame.isPossessed == true then
+    return
+  end
+
   local comparisonItem = buildComparisonItem(tooltip)
   if not comparisonItem then
     return

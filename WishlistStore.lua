@@ -115,10 +115,6 @@ function WishlistStore.setItemMetadata(db, characterKey, itemId, metadata)
     entry.inventoryType = metadata.inventoryType
   end
 
-  if metadata.bestLootedItemLevel ~= nil then
-    entry.bestLootedItemLevel = metadata.bestLootedItemLevel
-  end
-
   if metadata.selectedVariantRef ~= nil then
     entry.selectedVariantRef = metadata.selectedVariantRef
   end
@@ -131,26 +127,6 @@ end
 function WishlistStore.isTracked(db, characterKey, itemId)
   local entry = WishlistStore.getExistingItemEntry(db, characterKey, itemId)
   return entry ~= nil
-end
-
-function WishlistStore.updateBestLootedItemLevel(db, characterKey, itemId, itemLevel)
-  local entry = WishlistStore.getItemEntry(db, characterKey, itemId)
-  if not entry then return nil end
-
-  if itemLevel == nil then
-    return entry.bestLootedItemLevel
-  end
-
-  if entry.bestLootedItemLevel == nil or itemLevel > entry.bestLootedItemLevel then
-    entry.bestLootedItemLevel = itemLevel
-  end
-
-  return entry.bestLootedItemLevel
-end
-
-function WishlistStore.getBestLootedItemLevel(db, characterKey, itemId)
-  local entry = WishlistStore.getExistingItemEntry(db, characterKey, itemId)
-  return entry and entry.bestLootedItemLevel or nil
 end
 
 function WishlistStore.removeItem(db, characterKey, itemId)
@@ -205,7 +181,6 @@ function WishlistStore.getTrackedItems(db, characterKey)
     if type(entry) == "table" then
       table.insert(trackedItems, {
         itemID = tonumber(itemKey) or itemKey,
-        bestLootedItemLevel = entry.bestLootedItemLevel,
         encounterID = entry.encounterID,
         instanceID = entry.instanceID,
         inventoryType = entry.inventoryType,
@@ -304,6 +279,11 @@ function WishlistStore.repairTrackedMetadata(db, characterKey, namespace)
           changed = true
         end
       end
+
+      if entry.bestLootedItemLevel ~= nil then
+        entry.bestLootedItemLevel = nil
+        changed = true
+      end
     end
   end
 
@@ -332,7 +312,6 @@ local function migrateEntry(namespace, itemId, entry)
   end
 
   local migrated = {
-    bestLootedItemLevel = entry.bestLootedItemLevel,
     instanceID = entry.instanceID,
     encounterID = entry.encounterID,
     inventoryType = entry.inventoryType,

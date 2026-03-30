@@ -351,6 +351,7 @@ local function hideUnusedRows(frame, firstUnusedIndex)
     row.groupMode = nil
     row.instanceID = nil
     row.isBossHeader = nil
+    row.isPossessed = nil
     row.tooltipFooter = nil
   end
 end
@@ -755,6 +756,7 @@ local function renderGroupHeader(row, group, itemCount, collapsed)
   row.groupMode = group.mode
   row.instanceID = group.instanceID
   row.isBossHeader = false
+  row.isPossessed = nil
   row.tooltipRef = nil
   row.itemID = nil
   row.tooltipFooter = nil
@@ -797,6 +799,7 @@ local function renderItemRow(row, item)
     row.text:SetTextColor(0.65, 0.65, 0.65)
     row.text:SetText(item.displayText)
     row.isBossHeader = true
+    row.isPossessed = nil
     row.tooltipRef = nil
     row.itemID = nil
     row:SetScript("OnEnter", nil)
@@ -835,6 +838,7 @@ local function renderItemRow(row, item)
     end
 
     row.isBossHeader = false
+    row.isPossessed = item.showTick == true
     row.itemID = item.itemID
     row.tooltipRef = item.displayLink or item.tooltipRef
     row.tooltipFooter = item.tooltipFooter

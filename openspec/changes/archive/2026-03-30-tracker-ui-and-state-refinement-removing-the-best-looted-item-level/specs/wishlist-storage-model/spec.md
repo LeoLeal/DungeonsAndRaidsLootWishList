@@ -1,8 +1,4 @@
-## Purpose
-
-Define the normalized saved-variable model for tracked wishlist entries, including locale-neutral selected variant fallback data and current-version normalization behavior.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Wishlist storage persists canonical locale-neutral tracked-item state
 

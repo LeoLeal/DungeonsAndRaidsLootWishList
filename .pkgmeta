@@ -10,3 +10,4 @@ ignore:
   - logo.jpg
   - README.md
   - AGENTS.md
+  - wow-addon-taint.md
