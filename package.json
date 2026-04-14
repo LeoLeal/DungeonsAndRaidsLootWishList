@@ -1,8 +1,0 @@
-{
-  "scripts": {
-    "test": "node --test"
-  },
-  "devDependencies": {
-    "wasmoon": "^1.16.0"
-  }
-}

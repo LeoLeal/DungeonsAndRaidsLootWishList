@@ -1,12 +1,9 @@
 package-as: DungeonsAndRaidsLootWishList
 ignore:
-  - package.json
-  - package-lock.json
   - openspec
   - .agents
   - .opencode
   - tests
-  - node_modules
   - logo.jpg
   - README.md
   - AGENTS.md

@@ -8,32 +8,35 @@ This file is for both AI agents and human contributors. It describes the addon's
 
 ### System overview
 
-The addon is organized around a small set of focused Lua modules:
+The addon is organized around a folder-based module layout:
 
-- `LootWishList.lua` - addon entry point, event registration, refresh orchestration, shared namespace helpers
-- `WishlistStore.lua` - character-scoped saved-variable access and mutation
-- `ItemResolver.lua` - stable item identity resolution across links, item IDs, and scaled variants
-- `SourceResolver.lua` - loot-source grouping logic with fallback behavior
-- `TrackerModel.lua` - pure transformation from tracked items to grouped tracker rows
-- `TrackerRowStyle.lua` - tracker row presentation constants such as check atlas, offsets, and visual spacing
-- `TrackerUI.lua` - Objective Tracker section header, row creation, collapse behavior, and in-game rendering
-- `AdventureGuideUI.lua` - Encounter Journal / Adventure Guide integration and wishlist checkbox injection
-- `LootEvents.lua` - loot chat and loot-roll frame reactions
-- `Locales.lua` - all user-facing string lookup
+- `Core/Bootstrap.lua` - addon entry point, event registration, refresh orchestration, and top-level namespace wiring
+- `Core/Shared/ItemResolver.lua` - stable item identity resolution across links, item IDs, and scaled variants
+- `Core/Shared/TooltipCompare.lua` - shared tooltip comparison handling used by tracker and alert surfaces
+- `Core/Shared/Locales.lua` - all user-facing string lookup
+- `DataStore/WishlistStore.lua` - character-scoped saved-variable access and mutation
+- `DataStore/WishlistMigration.lua` - persistence normalization and saved-variable migration helpers
+- `DataStore/TrackerPreferences.lua` - persisted tracker grouping and collapse preferences
+- `AdventureGuide/Feature.lua` - public Adventure Guide feature entrypoint
+- `AdventureGuide/*` - Encounter Journal hooks, loot-row scanning, item-data extraction, metadata capture, and checkbox presentation
+- `Tracker/Feature.lua` - public tracker feature entrypoint
+- `Tracker/*` - tracker grouping, possession scanning, row styling, frame rendering, tooltip handling, and context menu behavior
+- `LootAwareness/Feature.lua` - public loot-awareness feature entrypoint
+- `LootAwareness/*` - loot event parsing, tracked-item matching, recent-self-loot handling, alert presentation, and roll badge behavior
 
 ### Data flow
 
 The intended runtime flow is:
 
 1. Adventure Guide loot rows expose a wishlist toggle.
-2. Toggling updates character-specific saved variables through `WishlistStore.lua`.
-3. `LootWishList.lua` rebuilds tracker state by combining:
+2. Toggling updates character-specific saved variables through `DataStore/WishlistStore.lua`.
+3. `Core/Bootstrap.lua` rebuilds tracker state by combining:
    - tracked items from saved variables
    - current possession state from bags / equipment / bank when known
-   - source grouping from stored metadata and source resolution
-4. `TrackerModel.lua` produces grouped row data.
-5. `TrackerUI.lua` renders the `Loot Wishlist` section in the Objective Tracker.
-6. `LootEvents.lua` updates or decorates UI in response to loot-related events.
+   - source grouping from stored metadata and tracker grouping helpers
+4. `Tracker/TrackerGroups.lua` produces grouped row data.
+5. `Tracker/Feature.lua` renders the `Loot Wishlist` section in the Objective Tracker.
+6. `LootAwareness/Feature.lua` updates or decorates UI in response to loot-related events.
 
 ### State model
 
@@ -58,9 +61,9 @@ Do not persist derived presentation state such as:
 
 Prefer putting deterministic logic in pure modules:
 
-- identity resolution in `ItemResolver.lua`
-- grouping in `SourceResolver.lua` and `TrackerModel.lua`
-- row presentation constants in `TrackerRowStyle.lua`
+- identity resolution in `Core/Shared/ItemResolver.lua`
+- grouping in `Tracker/TrackerGroups.lua`
+- row presentation constants in `Tracker/TrackerRowStyle.lua`
 
 Keep Blizzard frame manipulation, event hooks, and layout behavior in UI-facing modules only.
 
@@ -100,20 +103,22 @@ When adjusting tracker layout:
 
 When changing behavior, edit the narrowest responsible file first.
 
-- persistence bugs -> `WishlistStore.lua`
-- item matching bugs -> `ItemResolver.lua`
-- source grouping bugs -> `SourceResolver.lua`
-- tracker text / grouping output bugs -> `TrackerModel.lua`
-- spacing / atlas / row visual bugs -> `TrackerRowStyle.lua` or `TrackerUI.lua`
-- Encounter Journal checkbox bugs -> `AdventureGuideUI.lua`
-- loot chat / loot-roll behavior bugs -> `LootEvents.lua`
-- orchestration or refresh sequencing bugs -> `LootWishList.lua`
+- persistence bugs -> `DataStore/WishlistStore.lua`, `DataStore/WishlistMigration.lua`, or `DataStore/TrackerPreferences.lua`
+- item matching bugs -> `Core/Shared/ItemResolver.lua`
+- source grouping / tracker grouping bugs -> `Tracker/TrackerGroups.lua`
+- spacing / atlas / row visual bugs -> `Tracker/TrackerRowStyle.lua` or `Tracker/TrackerRows.lua`
+- Objective Tracker layout / frame bugs -> `Tracker/Feature.lua`, `Tracker/TrackerFrame.lua`, or `Tracker/TrackerAnchoring.lua`
+- Encounter Journal checkbox bugs -> `AdventureGuide/WishlistCheckboxes.lua`
+- Adventure Guide row scanning / metadata bugs -> `AdventureGuide/LootRowScanner.lua`, `AdventureGuide/LootRowItemData.lua`, or `AdventureGuide/MetadataCapture.lua`
+- loot chat / loot-roll behavior bugs -> `LootAwareness/LootEventHandlers.lua`, `LootAwareness/ChatLootParser.lua`, or `LootAwareness/LootMatcher.lua`
+- alert dialog / queue bugs -> `LootAwareness/Alerts/*`
+- orchestration or refresh sequencing bugs -> `Core/Bootstrap.lua`
 
-Avoid placing unrelated logic into `LootWishList.lua` just because it is the entry point.
+Avoid placing unrelated logic into `Core/Bootstrap.lua` just because it is the entry point.
 
 ### Localization-first strings
 
-All user-facing strings must come from `Locales.lua`.
+All user-facing strings must come from `Core/Shared/Locales.lua`.
 
 Do not introduce hard-coded UI text in runtime modules unless it is temporary debugging code that will be removed before completion.
 
@@ -129,7 +134,7 @@ In particular:
 
 ### Preserve testable seams
 
-If a behavior can be expressed as pure data transformation, keep it outside WoW-only frame APIs so it can be covered by the local Node + Wasmoon tests.
+If a behavior can be expressed as pure data transformation, keep it outside WoW-only frame APIs so it remains easy to verify with local tests when test coverage is added or restored.
 
 Good candidates for tests:
 
@@ -178,7 +183,7 @@ When modifying UI presentation:
 
 ### When adjusting UI styling
 
-- favor `TrackerRowStyle.lua` for row-level constants
+- favor `Tracker/TrackerRowStyle.lua` for row-level constants
 - favor Blizzard templates / atlases / fonts over custom assets
 - verify that a visual tweak does not unintentionally break stacking, alignment, or visibility
 

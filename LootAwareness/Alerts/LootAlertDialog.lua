@@ -1,4 +1,4 @@
-local WishListAlert = {}
+local LootAlertDialog = {}
 
 local lootAlertFrame = nil
 local lootAlertTooltip = CreateFrame("GameTooltip", "LootWishListAlertTooltip", UIParent, "GameTooltipTemplate")
@@ -104,12 +104,31 @@ local function getAlertItemColor(itemLink)
   return 1, 1, 1
 end
 
-function WishListAlert.Close()
+local function hideLootAlertTooltip()
   if lootAlertTooltip and alertNamespace and alertNamespace.TooltipCompare and alertNamespace.TooltipCompare.hide then
     alertNamespace.TooltipCompare.hide(lootAlertTooltip)
   elseif lootAlertTooltip then
     lootAlertTooltip:Hide()
   end
+end
+
+local function showLootAlertTooltip(anchor, itemLink)
+  if not lootAlertTooltip or not anchor or type(itemLink) ~= "string" or itemLink == "" then
+    return
+  end
+
+  hideLootAlertTooltip()
+  lootAlertTooltip:SetOwner(anchor, "ANCHOR_RIGHT")
+  lootAlertTooltip:SetHyperlink(itemLink)
+  lootAlertTooltip:Show()
+
+  if alertNamespace and alertNamespace.TooltipCompare and alertNamespace.TooltipCompare.showComparison then
+    alertNamespace.TooltipCompare.showComparison(lootAlertTooltip, anchor)
+  end
+end
+
+function LootAlertDialog.Close()
+  hideLootAlertTooltip()
 
   if lootAlertFrame and lootAlertFrame:IsShown() then
     playAlertSound("IG_MAINMENU_CLOSE")
@@ -117,7 +136,7 @@ function WishListAlert.Close()
   end
 end
 
-function WishListAlert.IsShown()
+function LootAlertDialog.IsShown()
   return lootAlertFrame and lootAlertFrame:IsShown() or false
 end
 
@@ -205,25 +224,10 @@ local function ensureLootAlertFrame(namespace)
       return
     end
 
-    if alertNamespace and alertNamespace.TooltipCompare and alertNamespace.TooltipCompare.hide then
-      alertNamespace.TooltipCompare.hide(lootAlertTooltip)
-    else
-      lootAlertTooltip:Hide()
-    end
-    lootAlertTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    lootAlertTooltip:SetHyperlink(itemLink)
-    lootAlertTooltip:Show()
-
-    if alertNamespace and alertNamespace.TooltipCompare and alertNamespace.TooltipCompare.showComparison then
-      alertNamespace.TooltipCompare.showComparison(lootAlertTooltip, self)
-    end
+    showLootAlertTooltip(self, itemLink)
   end)
   lootAlertFrame.itemButton:SetScript("OnLeave", function()
-    if alertNamespace and alertNamespace.TooltipCompare and alertNamespace.TooltipCompare.hide then
-      alertNamespace.TooltipCompare.hide(lootAlertTooltip)
-    else
-      lootAlertTooltip:Hide()
-    end
+    hideLootAlertTooltip()
   end)
 
   lootAlertFrame.button1 = CreateFrame("Button", nil, lootAlertFrame, "UIPanelButtonTemplate")
@@ -231,21 +235,17 @@ local function ensureLootAlertFrame(namespace)
   lootAlertFrame.button1:SetPoint("BOTTOM", lootAlertFrame, "BOTTOM", 0, 20)
   lootAlertFrame.button1:SetText(OKAY or "OK")
   lootAlertFrame.button1:SetScript("OnClick", function()
-    WishListAlert.Close()
+    LootAlertDialog.Close()
   end)
 
   lootAlertFrame:SetScript("OnHide", function(self)
-    if alertNamespace and alertNamespace.TooltipCompare and alertNamespace.TooltipCompare.hide then
-      alertNamespace.TooltipCompare.hide(lootAlertTooltip)
-    else
-      lootAlertTooltip:Hide()
-    end
+    hideLootAlertTooltip()
     self.record = nil
 
     if namespace.state.pendingLootAlerts and #namespace.state.pendingLootAlerts > 0 and not namespace.state.lootAlertFlushQueued then
       namespace.state.lootAlertFlushQueued = true
       namespace.QueueAfterCombat(function()
-        namespace.FlushLootAlerts()
+        namespace.LootAwareness.FlushAlerts(namespace)
       end)
     end
   end)
@@ -253,7 +253,7 @@ local function ensureLootAlertFrame(namespace)
   return lootAlertFrame
 end
 
-function WishListAlert.ShowFromRecord(namespace, record)
+function LootAlertDialog.ShowFromRecord(namespace, record)
   if type(record) ~= "table" then
     return
   end
@@ -287,7 +287,7 @@ end
 local _, namespace = ...
 if type(namespace) == "table" then
   alertNamespace = namespace
-  namespace.WishListAlert = WishListAlert
+  namespace.LootAlertDialog = LootAlertDialog
 end
 
-return WishListAlert
+return LootAlertDialog
