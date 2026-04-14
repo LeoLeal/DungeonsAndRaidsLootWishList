@@ -17,6 +17,9 @@ local CONTENT_TOP_GAP = 4
 local STANDALONE_HEADER_OFFSET_Y = -3
 local FRAME_LEFT_PADDING = 10
 local STANDALONE_HEADER_BOTTOM_MARGIN = 10
+local POST_TRANSITION_RESYNC_DELAY = 0.15
+
+local postTransitionSyncTimer = nil
 
 local function playAddAnimation(frame)
   if frame and frame.headerFrame and frame.headerFrame.AddAnim and frame.headerFrame.AddAnim.Restart then
@@ -102,8 +105,7 @@ syncTrackerFrame = function()
     return
   end
 
-  local showStandaloneHeader = (not ObjectiveTrackerFrame or not ObjectiveTrackerFrame:IsShown()) or
-    not ns.TrackerAnchoring.HasVisibleNativeTrackerSections()
+  local showStandaloneHeader = ns.TrackerAnchoring.GetAnchorMode() == "standalone"
 
   ns.TrackerAnchoring.AnchorTrackerFrame(frame)
   frame:Show()
@@ -258,6 +260,26 @@ syncTrackerFrame = function()
   end
 
   ns.TrackerTooltip.Reconcile(ns, trackerFrame)
+end
+
+function Tracker.RequestPostTransitionResync(runtimeNamespace)
+  ns = ns or runtimeNamespace
+
+  if postTransitionSyncTimer and postTransitionSyncTimer.Cancel then
+    postTransitionSyncTimer:Cancel()
+    postTransitionSyncTimer = nil
+  end
+
+  if type(C_Timer) ~= "table" or type(C_Timer.NewTimer) ~= "function" then
+    runtimeNamespace.RefreshTracker()
+    return
+  end
+
+  -- Coalesce loading-screen and teleport relayout into one post-transition sync.
+  postTransitionSyncTimer = C_Timer.NewTimer(POST_TRANSITION_RESYNC_DELAY, function()
+    postTransitionSyncTimer = nil
+    runtimeNamespace.RefreshTracker()
+  end)
 end
 
 function Tracker.Initialize(runtimeNamespace)

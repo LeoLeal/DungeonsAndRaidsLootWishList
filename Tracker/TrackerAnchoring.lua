@@ -5,7 +5,12 @@ local TrackerAnchoring = {}
 local DEFAULT_WIDTH = 260
 local TRACKER_SECTION_GAP = -10
 
-local function getTrackerReferenceFrame()
+local function isTrackerInDefaultPosition()
+  return ObjectiveTrackerFrame and type(ObjectiveTrackerFrame.IsInDefaultPosition) == "function" and
+      ObjectiveTrackerFrame:IsInDefaultPosition()
+end
+
+local function getNativeTrackerReferenceFrame()
   if ObjectiveTrackerFrame then
     if ObjectiveTrackerFrame.BlocksFrame then
       return ObjectiveTrackerFrame.BlocksFrame
@@ -17,6 +22,54 @@ local function getTrackerReferenceFrame()
   end
 
   return ObjectiveTrackerFrame
+end
+
+local function getStandaloneTrackerReferenceFrame()
+  if isTrackerInDefaultPosition() and UIParentRightManagedFrameContainer then
+    return UIParentRightManagedFrameContainer
+  end
+
+  return ObjectiveTrackerFrame
+end
+
+local function getReferenceWidth(...)
+  for index = 1, select("#", ...) do
+    local frame = select(index, ...)
+    local width = frame and frame.GetWidth and frame:GetWidth() or nil
+    if width and width > 0 then
+      return width
+    end
+  end
+
+  return DEFAULT_WIDTH
+end
+
+local function getStandaloneReferenceWidth(standaloneParent, nativeParent)
+  if ObjectiveTrackerFrame and ObjectiveTrackerFrame.Header and ObjectiveTrackerFrame.Header.GetWidth then
+    local headerWidth = ObjectiveTrackerFrame.Header:GetWidth()
+    if headerWidth and headerWidth > 0 then
+      return headerWidth
+    end
+  end
+
+  return getReferenceWidth(ObjectiveTrackerFrame, standaloneParent, nativeParent)
+end
+
+local function getRelativeTopRightOffset(frame, relativeTo)
+  if not frame or not relativeTo then
+    return 0, 0
+  end
+
+  local frameRight = frame.GetRight and frame:GetRight() or nil
+  local frameTop = frame.GetTop and frame:GetTop() or nil
+  local relativeRight = relativeTo.GetRight and relativeTo:GetRight() or nil
+  local relativeTop = relativeTo.GetTop and relativeTo:GetTop() or nil
+
+  if not frameRight or not frameTop or not relativeRight or not relativeTop then
+    return 0, 0
+  end
+
+  return frameRight - relativeRight, frameTop - relativeTop
 end
 
 function TrackerAnchoring.IsTrackerExplicitlyCollapsed()
@@ -40,7 +93,7 @@ function TrackerAnchoring.IsNativeTrackerShown()
     return false
   end
 
-  local parent = getTrackerReferenceFrame()
+  local parent = getNativeTrackerReferenceFrame()
   if parent and type(parent.IsShown) == "function" then
     return parent:IsShown()
   end
@@ -72,18 +125,34 @@ function TrackerAnchoring.GetBottommostVisibleChild(parent)
 end
 
 function TrackerAnchoring.HasVisibleNativeTrackerSections()
-  local parent = getTrackerReferenceFrame()
+  local parent = getNativeTrackerReferenceFrame()
   local anchorTarget = select(1, TrackerAnchoring.GetBottommostVisibleChild(parent))
   return anchorTarget ~= nil
 end
 
+function TrackerAnchoring.GetAnchorMode()
+  if TrackerAnchoring.IsNativeTrackerShown() and TrackerAnchoring.HasVisibleNativeTrackerSections() then
+    return "append"
+  end
+
+  return "standalone"
+end
+
 function TrackerAnchoring.AnchorTrackerFrame(frame)
-  local parent = getTrackerReferenceFrame()
-  if not frame or not parent then
+  local nativeParent = getNativeTrackerReferenceFrame()
+  local standaloneParent = getStandaloneTrackerReferenceFrame()
+  if not frame or (not nativeParent and not standaloneParent) then
     return
   end
 
-  local width = parent.GetWidth and parent:GetWidth() or DEFAULT_WIDTH
+  local anchorMode = TrackerAnchoring.GetAnchorMode()
+  local width = nil
+  if anchorMode == "standalone" then
+    width = getStandaloneReferenceWidth(standaloneParent, nativeParent)
+  else
+    width = getReferenceWidth(nativeParent, standaloneParent)
+  end
+
   if width and width > 0 then
     frame:SetWidth(width)
     if frame.headerFrame then
@@ -93,10 +162,10 @@ function TrackerAnchoring.AnchorTrackerFrame(frame)
 
   frame:ClearAllPoints()
 
-  if TrackerAnchoring.IsNativeTrackerShown() then
-    local anchorTarget, _, anchorLeft = TrackerAnchoring.GetBottommostVisibleChild(parent)
+  if anchorMode == "append" and nativeParent then
+    local anchorTarget, _, anchorLeft = TrackerAnchoring.GetBottommostVisibleChild(nativeParent)
     if anchorTarget then
-      local parentLeft = parent.GetLeft and parent:GetLeft() or nil
+      local parentLeft = nativeParent.GetLeft and nativeParent:GetLeft() or nil
       local offsetX = 0
       if parentLeft and anchorLeft then
         offsetX = parentLeft - anchorLeft
@@ -107,7 +176,20 @@ function TrackerAnchoring.AnchorTrackerFrame(frame)
     end
   end
 
-  frame:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
+  if standaloneParent then
+    if isTrackerInDefaultPosition() and standaloneParent == UIParentRightManagedFrameContainer then
+      local offsetX, offsetY = getRelativeTopRightOffset(ObjectiveTrackerFrame, standaloneParent)
+      frame:SetPoint("TOPRIGHT", standaloneParent, "TOPRIGHT", offsetX, offsetY)
+    else
+      frame:SetPoint("TOPLEFT", standaloneParent, "TOPLEFT", 0, 0)
+      if ObjectiveTrackerFrame then
+        frame:SetPoint("TOPRIGHT", ObjectiveTrackerFrame, "TOPRIGHT", 0, 0)
+      end
+    end
+    return
+  end
+
+  frame:SetPoint("TOPLEFT", nativeParent, "TOPLEFT", 0, 0)
 end
 
 function TrackerAnchoring.HookTrackerState(trackerFrame, syncTrackerFrame)
@@ -158,6 +240,12 @@ function TrackerAnchoring.HookTrackerState(trackerFrame, syncTrackerFrame)
 
   if type(ObjectiveTrackerFrame.SetCollapsed) == "function" then
     hooksecurefunc(ObjectiveTrackerFrame, "SetCollapsed", function()
+      syncTrackerFrame()
+    end)
+  end
+
+  if type(UIParent_ManageFramePositions) == "function" then
+    hooksecurefunc("UIParent_ManageFramePositions", function()
       syncTrackerFrame()
     end)
   end

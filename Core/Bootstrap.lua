@@ -306,6 +306,8 @@ function Bootstrap.RegisterEvents(runtimeNamespace)
   trackedEventFrame:RegisterEvent("BANKFRAME_CLOSED")
   trackedEventFrame:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
   trackedEventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+  trackedEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+  trackedEventFrame:RegisterEvent("LOADING_SCREEN_DISABLED")
   trackedEventFrame:RegisterEvent("TOOLTIP_DATA_UPDATE")
 end
 
@@ -386,6 +388,10 @@ function Bootstrap.HandleEvent(runtimeNamespace, event, ...)
     runtimeNamespace.state.hasPendingItemTrackRefresh = hasRemaining and next(pending) ~= nil or false
     runtimeNamespace.RefreshAll()
     return true
+  end
+
+  if event == "PLAYER_ENTERING_WORLD" or event == "LOADING_SCREEN_DISABLED" then
+    runtimeNamespace.Tracker.RequestPostTransitionResync(runtimeNamespace)
   end
 
   if not InCombatLockdown() then
