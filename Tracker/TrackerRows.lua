@@ -149,7 +149,7 @@ function TrackerRows.HideUnused(frame, firstUnusedIndex)
     row.instanceID = nil
     row.isBossHeader = nil
     row.isPossessed = nil
-    row.tooltipFooter = nil
+    row.tooltipFooterLines = nil
   end
 end
 
@@ -182,7 +182,7 @@ function TrackerRows.RenderGroupHeader(runtimeNamespace, frame, row, group, item
   row.isPossessed = nil
   row.tooltipRef = nil
   row.itemID = nil
-  row.tooltipFooter = nil
+  row.tooltipFooterLines = nil
   row:SetScript("OnClick", function(self, button)
     if button ~= "LeftButton" then
       return
@@ -262,7 +262,7 @@ function TrackerRows.RenderItemRow(runtimeNamespace, frame, row, item, callbacks
     row.isPossessed = item.showTick == true
     row.itemID = item.itemID
     row.tooltipRef = item.displayLink or item.tooltipRef
-    row.tooltipFooter = item.tooltipFooter
+    row.tooltipFooterLines = item.tooltipFooterLines
     row:SetScript("OnEnter", callbacks.onEnter)
     row:SetScript("OnLeave", callbacks.onLeave)
     row:SetScript("OnClick", callbacks.onClick)

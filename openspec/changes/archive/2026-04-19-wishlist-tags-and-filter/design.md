@@ -161,17 +161,17 @@ The confirmation is part of tag-management semantics, not loot-awareness. Reusin
 
 **Decision**
 
-Tracker will own a filter button positioned between attach/detach and grouping controls. The filter menu will only offer tags currently used by at least one tracked item. Selected tags use OR semantics. No selection means show all items.
+Tracker will own a filter button positioned between attach/detach and grouping controls. The filter menu will only offer tags currently used by at least one tracked item. Selected tags use OR semantics. No selection means show all items. The current filter selection will be persisted per character as tracker-local presentation state so the same filter comes back after reloads and relogs.
 
-Tracker filter state is tracker-local presentation state. It must not change persisted membership, loot matching, alert triggers, or badge presence. Whenever tags are deleted or become unused, the filter selection must be pruned automatically against the current used-tag set. If pruning removes every selected tag, the result is an empty selection which shows all items.
+Tracker filter state is tracker-local presentation state. It must not change persisted membership, loot matching, alert triggers, or badge presence even though the selection itself is stored per character. Whenever tags are deleted or become unused, the filter selection must be pruned automatically against the current used-tag set. If pruning removes every selected tag, the result is an empty selection which shows all items.
 
 **Rationale**
 
-This satisfies the user's requirement that zero-match dead states should not persist and that tracker filtering must never leak into non-tracker features.
+This satisfies the user's requirement that stale zero-match filter states should not persist while still letting the user keep a meaningful tracker view preference across sessions. Persisting the selection on the tracker preference state keeps it local to tracker presentation instead of turning it into wishlist-domain data.
 
 **Alternatives considered**
 
-- **Persist filter selections in DataStore immediately**: possible future enhancement, but rejected for now because filter state is presentation-only and does not need to survive reloads to satisfy the change.
+- **Do not persist filter selections and always reset to show-all on reload**: rejected because the implemented tracker preference model already stores tracker-local presentation state cleanly and restoring the user's selection is useful without affecting membership semantics.
 - **Offer all catalog tags in the filter menu, including unused tags**: rejected because the user wants only currently used tags to appear.
 
 ### 7. Filter after loading tracked items but before grouping/rendering
@@ -231,7 +231,7 @@ Surface-specific output:
 
 - tracker tooltip: favorite atlas + `tag1, tag2, tag3`
 - loot roll badge: `Wishlist: tag1, tag2, tag3`
-- loot alert message: `<player> looted an item on your Wishlist(tag1, tag2, tag3)!`
+- loot alert message: `<player> looted an item on your Wishlist (tag1, tag2, tag3)!`
 
 LootAwareness should read assigned tags from the tracked item entry or a shared formatter helper, never from tracker visibility state.
 

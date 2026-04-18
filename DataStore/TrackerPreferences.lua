@@ -35,6 +35,7 @@ local function ensureTrackerState(character)
   character.tracker.collapsedGroupsByMode = character.tracker.collapsedGroupsByMode or {}
   character.tracker.collapsedGroupsByMode.source = character.tracker.collapsedGroupsByMode.source or {}
   character.tracker.collapsedGroupsByMode.slot = character.tracker.collapsedGroupsByMode.slot or {}
+  character.tracker.tagFilterSelection = type(character.tracker.tagFilterSelection) == "table" and character.tracker.tagFilterSelection or {}
   character.tracker.attachmentMode = normalizeAttachmentMode(character.tracker.attachmentMode)
   character.tracker.detachedLocked = character.tracker.detachedLocked == true
   character.tracker.detachedPosition = normalizeDetachedPosition(character.tracker.detachedPosition)
@@ -123,6 +124,10 @@ function TrackerPreferences.toggleGroupCollapse(character, groupBy, groupKey)
   local currentState = collapsedGroups[groupKey] == true
   TrackerPreferences.setGroupCollapsed(character, groupBy, groupKey, not currentState)
   return not currentState
+end
+
+function TrackerPreferences.getTagFilterSelection(character)
+  return ensureTrackerState(character).tagFilterSelection
 end
 
 if type(namespace) == "table" then

@@ -3,7 +3,7 @@
 ## Notes: Adventure Guide loot wishlist and tracker integration
 ## Notes-ruRU: Позволяет управлять списками желаемой добычи
 ## Author: Leonardo Leal
-## Version: v1.4.0
+## Version: v1.5.0
 ## SavedVariablesPerCharacter: LootWishListDB
 ## IconTexture: Interface\AddOns\DungeonsAndRaidsLootWishList\logo
 
@@ -25,6 +25,7 @@ Core/Shared/TooltipCompare.lua
 DataStore/TrackerPreferences.lua
 DataStore/WishlistMigration.lua
 DataStore/WishlistStore.lua
+Core/Shared/WishlistTags.lua
 Tracker/TrackerGroups.lua
 Tracker/TrackerRenderData.lua
 Tracker/TrackerRowStyle.lua
@@ -32,6 +33,7 @@ Tracker/PossessionScanner.lua
 Tracker/RaidBossOrdering.lua
 Tracker/TrackerAnchoring.lua
 Tracker/TrackerContextMenu.lua
+Tracker/TrackerFilterMenu.lua
 Tracker/TrackerHeaders.lua
 Tracker/TrackerRows.lua
 Tracker/TrackerFrame.lua
@@ -40,6 +42,7 @@ Tracker/TrackerTooltip.lua
 AdventureGuide/MetadataCapture.lua
 AdventureGuide/LootRowScanner.lua
 AdventureGuide/LootRowItemData.lua
+AdventureGuide/WishlistTagPopover.lua
 AdventureGuide/WishlistCheckboxes.lua
 AdventureGuide/JournalHooks.lua
 AdventureGuide/Feature.lua

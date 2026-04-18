@@ -77,7 +77,8 @@ function RollBadgeView.ShowForRoll(runtimeNamespace, rollID)
     return
   end
 
-  badge.text:SetText(runtimeNamespace.GetText("WISHLIST"))
+  local tags = runtimeNamespace.GetOrderedAssignedTags(itemID)
+  badge.text:SetText(runtimeNamespace.GetText("WISHLIST_WITH_TAGS", runtimeNamespace.FormatWishlistTagList(tags)))
   badge:SetWidth((LOOT_ROLL_BADGE_SIDE_PADDING * 2) + LOOT_ROLL_BADGE_ICON_SIZE + LOOT_ROLL_BADGE_GAP +
     badge.text:GetStringWidth())
   badge:ClearAllPoints()

@@ -1,15 +1,19 @@
-## ADDED Requirements
+## Purpose
+
+Define the Adventure Guide wishlist tag UI, including the favorite icon, live-apply popover, and destructive tag-delete confirmation flow.
+
+## Requirements
 
 ### Requirement: Adventure Guide loot rows use a favorite icon for wishlist tags
-The system SHALL replace Adventure Guide wishlist checkboxes with a favorite icon control. The control SHALL use `auctionhouse-icon-favorite-off` when the item has no assigned tags and `auctionhouse-icon-favorite` when the item has one or more assigned tags.
+The system SHALL replace Adventure Guide wishlist checkboxes with a favorite icon control with background ring. The control SHALL use `delves-scenario-heart-icon` with grey tint when the item has no assigned tags and white when the item has one or more assigned tags, surrounded by a background ring using `pvpqueue-rewardring-black` or `pvpqueue-rewardring` depending on state.
 
 #### Scenario: Untracked loot row shows the off favorite icon
 - **WHEN** the Adventure Guide renders a loot row for an item with no assigned wishlist tags
-- **THEN** the row shows the `auctionhouse-icon-favorite-off` atlas
+- **THEN** the row shows the `delves-scenario-heart-icon` atlas with black tint on a darker background ring
 
 #### Scenario: Tagged loot row shows the on favorite icon
 - **WHEN** the Adventure Guide renders a loot row for an item with one or more assigned wishlist tags
-- **THEN** the row shows the `auctionhouse-icon-favorite` atlas
+- **THEN** the row shows the `delves-scenario-heart-icon` atlas with white color on an active background ring
 
 ### Requirement: Favorite icon opens a live-apply tag popover
 The system SHALL open a compact addon-owned popover near the cursor to the right of the clicked favorite icon. The popover SHALL size to its contents, use a parchment-friendly nineslice, include a close icon in the top-right corner, and dismiss when the user clicks either that close icon or outside the popover. Dismissing the popover SHALL NOT revert already applied changes.
@@ -27,7 +31,7 @@ The system SHALL open a compact addon-owned popover near the cursor to the right
 - **THEN** the system dismisses the popover without reverting any already applied tag changes
 
 ### Requirement: Popover manages item tag assignment with live apply
-The popover SHALL list the current wishlist tags with a checkbox to the left of each label and a delete button to the right. Checking or unchecking a tag SHALL immediately assign or unassign that tag on the current item. Below the tag list, the popover SHALL provide a text input and `Add` button for creating new tags, and creating a new tag SHALL NOT automatically assign it to the current item.
+The popover SHALL list the current wishlist tags with a checkbox to the left of each label and a delete button to the right. Checking or unchecking a tag SHALL immediately assign or unassign that tag on the current item. Below the tag list, the popover SHALL provide a text input and `Create` button for creating new tags, with a "Create a new tag" label above the input, and creating a new tag SHALL NOT automatically assign it to the current item.
 
 #### Scenario: Checking a tag immediately assigns it to the item
 - **WHEN** the user checks a tag in the Adventure Guide popover for the current item

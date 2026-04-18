@@ -5,6 +5,7 @@ local TrackerHeaders = {}
 local COLLAPSE_ATLAS = "ui-questtrackerbutton-secondary-collapse"
 local EXPAND_ATLAS = "ui-questtrackerbutton-secondary-expand"
 local ATTACH_BUTTON_SIZE = 18
+local FILTER_BUTTON_SIZE = 18
 local LOCK_BUTTON_SIZE = 18
 local HEADER_TITLE_INSET = 10
 local DETACHED_HEADER_TITLE_OFFSET = -3
@@ -117,6 +118,17 @@ function TrackerHeaders.ApplyAttachmentButtonState(button, detached)
   button:SetPushedAtlas(atlasSet.pushed)
 end
 
+function TrackerHeaders.ApplyFilterButtonState(runtimeNamespace, button)
+  if not button then
+    return
+  end
+
+  button:SetSize(FILTER_BUTTON_SIZE, FILTER_BUTTON_SIZE)
+  if runtimeNamespace and runtimeNamespace.TrackerFilterMenu then
+    runtimeNamespace.TrackerFilterMenu.ApplyButtonState(runtimeNamespace, button)
+  end
+end
+
 function TrackerHeaders.ApplyLockButtonState(button, locked)
   if not button then
     return
@@ -223,6 +235,7 @@ function TrackerHeaders.LayoutHeaderControls(frame, runtimeNamespace, options)
   local collapseButton = options.collapseButton
   local clickButton = options.clickButton
   local showAttachButton = options.showAttachButton == true
+  local showFilterButton = options.showFilterButton == true
   local showGroupingButton = options.showGroupingButton == true
   local showLockButton = options.showLockButton == true
   local detached = options.detached == true
@@ -232,11 +245,15 @@ function TrackerHeaders.LayoutHeaderControls(frame, runtimeNamespace, options)
   end
 
   local attachButton = frame.attachDetachButton
+  local filterButton = frame.filterButton
   local groupingButton = frame.groupingButton
   local lockButton = frame.lockButton
 
   TrackerHeaders.ApplyAttachmentButtonState(attachButton, detached)
   attachButton:SetShown(showAttachButton)
+
+  TrackerHeaders.ApplyFilterButtonState(runtimeNamespace, filterButton)
+  filterButton:SetShown(showFilterButton)
 
   setTextButtonState(groupingButton, TrackerHeaders.GetGroupingButtonText(runtimeNamespace))
   groupingButton:SetShown(showGroupingButton)
@@ -259,11 +276,11 @@ function TrackerHeaders.LayoutHeaderControls(frame, runtimeNamespace, options)
     leftmostControl = attachButton
   end
 
-  if showLockButton then
-    lockButton:ClearAllPoints()
-    lockButton:SetPoint("RIGHT", rightTarget, "LEFT", -HEADER_CONTROL_GAP, 0)
-    rightTarget = lockButton
-    leftmostControl = lockButton
+  if showFilterButton then
+    filterButton:ClearAllPoints()
+    filterButton:SetPoint("RIGHT", rightTarget, "LEFT", -HEADER_CONTROL_GAP, 0)
+    rightTarget = filterButton
+    leftmostControl = filterButton
   end
 
   if showGroupingButton then
@@ -271,6 +288,13 @@ function TrackerHeaders.LayoutHeaderControls(frame, runtimeNamespace, options)
     groupingButton:SetPoint("RIGHT", rightTarget, "LEFT", -HEADER_CONTROL_GAP, 0)
     rightTarget = groupingButton
     leftmostControl = groupingButton
+  end
+
+  if showLockButton then
+    lockButton:ClearAllPoints()
+    lockButton:SetPoint("RIGHT", rightTarget, "LEFT", -HEADER_CONTROL_GAP, 0)
+    rightTarget = lockButton
+    leftmostControl = lockButton
   end
 
   headerText:ClearAllPoints()

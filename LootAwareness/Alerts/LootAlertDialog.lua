@@ -269,9 +269,11 @@ function LootAlertDialog.ShowFromRecord(namespace, record)
     return
   end
 
+  local formattedTags = namespace.FormatWishlistTagList(record.tags or namespace.GetOrderedAssignedTags(record.itemID))
   local message = string.format(
     namespace.GetText("PLAYER_LOOTED_WISHLIST_ITEM") or "%s looted an item on your Wishlist!",
-    "|cffffcc00" .. playerName .. "|cFFFFFFFF"
+    "|cffffcc00" .. playerName .. "|cFFFFFFFF",
+    formattedTags
   )
 
   frame.record = record

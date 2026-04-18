@@ -245,7 +245,8 @@ function TrackerGroups.buildGroups(items, options)
             sourceLabel = item.sourceLabel,
             bossName = item.bossName,
             inventoryType = item.inventoryType,
-            tooltipFooter = item.tooltipFooter,
+            tags = item.tags,
+            tooltipFooterLines = item.tooltipFooterLines,
             isRaidSource = item.isRaidSource,
           })
         end
@@ -262,7 +263,8 @@ function TrackerGroups.buildGroups(items, options)
           sourceLabel = item.sourceLabel,
           bossName = item.bossName,
           inventoryType = item.inventoryType,
-          tooltipFooter = item.tooltipFooter,
+          tags = item.tags,
+          tooltipFooterLines = item.tooltipFooterLines,
           isRaidSource = item.isRaidSource,
         })
       end

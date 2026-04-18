@@ -86,7 +86,7 @@ local function applyDetachedDragState(runtimeNamespace, frame)
   end
 
   frame.runtimeNamespace = runtimeNamespace
-  frame:SetClampedToScreen(true)
+  frame:SetClampedToScreen(isDetached(runtimeNamespace))
   installDetachedDragScripts(frame)
 
   local dragEnabled = isDetached(runtimeNamespace) and runtimeNamespace and

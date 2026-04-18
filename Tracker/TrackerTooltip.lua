@@ -104,9 +104,18 @@ function TrackerTooltip.Show(runtimeNamespace, row)
     trackerTooltip:SetItemByID(id)
   end
 
-  if type(row.tooltipFooter) == "string" and row.tooltipFooter ~= "" then
+  local footerLines = nil
+  if type(row.tooltipFooterLines) == "table" and #row.tooltipFooterLines > 0 then
+    footerLines = row.tooltipFooterLines
+  elseif type(row.tooltipFooter) == "string" and row.tooltipFooter ~= "" then
+    footerLines = { row.tooltipFooter }
+  end
+
+  if footerLines then
     trackerTooltip:AddLine(" ")
-    trackerTooltip:AddLine(row.tooltipFooter, 0.75, 0.75, 0.75, true)
+    for _, footerLine in ipairs(footerLines) do
+      trackerTooltip:AddLine(footerLine, 0.75, 0.75, 0.75, true)
+    end
   end
 
   trackerTooltip:Show()

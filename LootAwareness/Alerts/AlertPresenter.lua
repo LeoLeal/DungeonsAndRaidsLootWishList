@@ -17,6 +17,7 @@ function AlertPresenter.BuildLootAlertRecord(runtimeNamespace, itemID, playerNam
     itemName = runtimeNamespace.GetItemInfoName(itemID),
     itemLink = itemLink,
     playerName = playerName,
+    tags = runtimeNamespace.GetOrderedAssignedTags(itemID),
   }
 end
 

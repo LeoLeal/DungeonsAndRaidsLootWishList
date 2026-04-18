@@ -6,6 +6,7 @@ local DEFAULT_WIDTH = 260
 local HEADER_HEIGHT = 26
 local STANDALONE_HEADER_OFFSET_Y = -3
 local LOCK_BUTTON_SIZE = 18
+local FILTER_BUTTON_SIZE = 18
 
 local function createTextButton(parent, onClick)
   local button = CreateFrame("Button", nil, parent)
@@ -55,6 +56,10 @@ function TrackerFrame.Create(runtimeNamespace, callbacks)
   trackerFrame.attachDetachButton = CreateFrame("Button", nil, trackerFrame)
   trackerFrame.attachDetachButton:SetScript("OnClick", callbacks.onToggleAttachment)
   trackerFrame.attachDetachButton:SetHighlightAtlas("RedButton-Highlight", "ADD")
+
+  trackerFrame.filterButton = CreateFrame("Button", nil, trackerFrame)
+  trackerFrame.filterButton:SetScript("OnClick", callbacks.onToggleFilter)
+  trackerFrame.filterButton:SetSize(FILTER_BUTTON_SIZE, FILTER_BUTTON_SIZE)
 
   trackerFrame.contentFrame = CreateFrame("Frame", nil, trackerFrame)
 

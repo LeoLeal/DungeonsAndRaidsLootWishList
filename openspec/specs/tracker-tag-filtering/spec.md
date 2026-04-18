@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Define tracker-specific tag filtering controls, persisted presentation behavior, and tag-aware tooltip footer rendering.
+
+## Requirements
 
 ### Requirement: Wishlist tracker header exposes a tag filter button
 The system SHALL display a tag filter button in the wishlist tracker header between the attach or detach control and the grouping control. The button SHALL use `UI-QuestTrackerButton-Filter` as its normal atlas, `UI-QuestTrackerButton-Filter-Pressed` as its pressed atlas, and `UI-QuestTrackerButton-Red-Highlight` as its highlight atlas.
@@ -17,7 +21,7 @@ When only one tag exists in the addon, the system SHALL tint the tracker filter 
 - **AND** the user cannot click it to open the filter menu
 
 ### Requirement: Tracker filter menu shows only used tags and applies OR matching
-The tracker filter menu SHALL list only tags currently assigned to at least one wishlist item. Each listed tag SHALL have a checkbox. Selecting multiple tags SHALL show items that carry any selected tag. No selected tags SHALL show all wishlist items, and selecting every available filter tag SHALL behave the same as selecting none.
+The tracker filter menu SHALL list only tags currently assigned to at least one wishlist item. Each listed tag SHALL have a checkbox. Selecting multiple tags SHALL show items that carry any selected tag. No selected tags SHALL show all wishlist items, and selecting every available filter tag SHALL behave the same as selecting none. The tracker SHALL persist the current filter selection per character so the same selection is restored after reloads or relogs until it is changed or pruned.
 
 #### Scenario: Filter menu excludes unused tags
 - **WHEN** the user opens the tracker filter menu
@@ -35,8 +39,12 @@ The tracker filter menu SHALL list only tags currently assigned to at least one 
 - **WHEN** the tracker filter menu has every available filter tag selected
 - **THEN** the tracker shows the same item set as it would with no selected tags
 
+#### Scenario: Filter selection is restored after reload
+- **WHEN** the player selects one or more tracker filter tags and later reloads the UI or logs back in on the same character
+- **THEN** the tracker restores that character's previously selected filter tags
+
 ### Requirement: Tracker filter state remains presentation-only and self-healing
-The tracker tag filter SHALL affect only which wishlist items are visible in the tracker. It SHALL NOT change wishlist membership, tag assignments, loot alert triggering, or loot roll badge presence. If a selected filter tag is deleted or becomes unused, the system SHALL automatically remove that stale selection from the tracker filter state, and if no selections remain the tracker SHALL revert to showing all wishlist items.
+The tracker tag filter SHALL affect only which wishlist items are visible in the tracker. It SHALL NOT change wishlist membership, tag assignments, loot alert triggering, or loot roll badge presence. The selected filter state MAY be persisted per character, but that persisted state SHALL remain tracker-local presentation data only. If a selected filter tag is deleted or becomes unused, the system SHALL automatically remove that stale selection from the tracker filter state, and if no selections remain the tracker SHALL revert to showing all wishlist items.
 
 #### Scenario: Filtering does not change underlying tracked membership
 - **WHEN** the user filters the tracker to a subset of wishlist tags
@@ -50,6 +58,11 @@ The tracker tag filter SHALL affect only which wishlist items are visible in the
 - **WHEN** every currently selected tracker filter tag becomes stale and is pruned
 - **THEN** the tracker reverts to an empty filter selection
 - **AND** the tracker shows all wishlist items
+
+#### Scenario: Persisted filtering does not change underlying tracked membership
+- **WHEN** the tracker restores a persisted filter selection for the active character
+- **THEN** items hidden by that restored selection remain tracked wishlist items with their existing tag assignments unchanged
+- **AND** loot alerts and loot roll badges remain unaffected by that restored filter selection
 
 ### Requirement: Tracker item tooltips show assigned tags in the footer
 Tracker item tooltips SHALL append a wishlist footer line using the favorite atlas and the item's assigned tags joined by comma and space. In source-grouped mode, the tooltip SHALL append only that tags line. In equipment-slot-grouped mode, the tooltip SHALL append the tags line above the existing source footer line.

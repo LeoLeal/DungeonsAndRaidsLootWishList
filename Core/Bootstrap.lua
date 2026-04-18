@@ -73,6 +73,11 @@ end
 namespace.GetCurrentDb = getCurrentDb
 namespace.GetCharacterKey = getCharacterKey
 
+local function refreshWishlistSurfaces()
+  namespace.RefreshAllImmediate()
+  namespace.AdventureGuide.Refresh(namespace)
+end
+
 function namespace.MarkRecentSelfLoot(itemID)
   return namespace.RecentSelfLoot.Mark(namespace, itemID)
 end
@@ -102,6 +107,22 @@ namespace.GetItemInfoName = getItemInfoName
 
 function namespace.GetText(key, ...)
   return namespace.Locales.getString(getLocaleId(), key, ...)
+end
+
+function namespace.GetWishlistTags()
+  return namespace.WishlistTags.getOrderedCatalogTags(namespace)
+end
+
+function namespace.GetUsedWishlistTags()
+  return namespace.WishlistTags.getUsedTags(namespace)
+end
+
+function namespace.GetOrderedAssignedTags(itemID)
+  return namespace.WishlistTags.getOrderedAssignedTags(namespace, itemID)
+end
+
+function namespace.FormatWishlistTagList(tags)
+  return namespace.WishlistTags.formatTagList(tags)
 end
 
 function namespace.IsTrackedItem(itemID)
@@ -152,10 +173,69 @@ function namespace.ToggleTrackerDetachedLocked()
   return isLocked
 end
 
+function namespace.GetTrackerTagFilterSelection()
+  return namespace.WishlistStore.getTrackerTagFilterSelection(getCurrentDb(), getCharacterKey())
+end
+
 function namespace.RemoveTrackedItem(itemID)
   namespace.WishlistStore.removeItem(getCurrentDb(), getCharacterKey(), itemID)
-  namespace.RefreshAllImmediate()
-  namespace.AdventureGuide.Refresh(namespace)
+  refreshWishlistSurfaces()
+end
+
+function namespace.AddWishlistTag(tagLabel)
+  local created, result = namespace.WishlistStore.createTag(getCurrentDb(), getCharacterKey(), tagLabel)
+  if created then
+    refreshWishlistSurfaces()
+  end
+
+  return created, result
+end
+
+function namespace.PreviewDeleteWishlistTag(tagLabel)
+  return namespace.WishlistStore.previewDeleteTag(getCurrentDb(), getCharacterKey(), tagLabel)
+end
+
+function namespace.DeleteWishlistTag(tagLabel)
+  local deleted, result, affectedItems = namespace.WishlistStore.deleteTag(getCurrentDb(), getCharacterKey(), tagLabel)
+  if deleted then
+    refreshWishlistSurfaces()
+  end
+
+  return deleted, result, affectedItems
+end
+
+function namespace.SetItemTagFromItemData(itemData, tagLabel, assigned)
+  local normalized = namespace.ItemResolver.normalizeItemData(itemData)
+  if not normalized or type(tagLabel) ~= "string" then
+    return false
+  end
+
+  local db = getCurrentDb()
+  local characterKey = getCharacterKey()
+  local ok = false
+
+  if assigned then
+    ok = namespace.WishlistStore.assignTag(db, characterKey, normalized.itemID, tagLabel)
+    if ok then
+      namespace.WishlistStore.setItemMetadata(db, characterKey, normalized.itemID, {
+        encounterID = normalized.encounterID,
+        instanceID = normalized.instanceID,
+        inventoryType = normalized.inventoryType,
+        selectedVariantRef = normalized.selectedVariantRef,
+      })
+      if normalized.instanceID then
+        namespace.Tracker.PrimeEncounterDataForInstance(namespace, normalized.instanceID)
+      end
+    end
+  else
+    ok = namespace.WishlistStore.unassignTag(db, characterKey, normalized.itemID, tagLabel)
+  end
+
+  if ok then
+    refreshWishlistSurfaces()
+  end
+
+  return ok
 end
 
 local function extractTooltipLineText(lineData)
@@ -301,8 +381,7 @@ function namespace.SetTrackedFromItemData(itemData, tracked)
     namespace.WishlistStore.removeItem(db, characterKey, normalized.itemID)
   end
 
-  namespace.RefreshAllImmediate()
-  namespace.AdventureGuide.Refresh(namespace)
+  refreshWishlistSurfaces()
 end
 
 function namespace.RefreshTracker()

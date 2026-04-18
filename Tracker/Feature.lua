@@ -95,8 +95,10 @@ syncTrackerFrame = function()
   end
 
   ns.TrackerContextMenu.Close()
+  ns.TrackerFilterMenu.Refresh(ns)
 
   if not currentGroups or #currentGroups == 0 then
+    ns.TrackerFilterMenu.Close()
     clearHoveredTrackerRow()
     hideTrackerTooltip()
     frame:Hide()
@@ -105,6 +107,7 @@ syncTrackerFrame = function()
 
   local detached = isTrackerDetached()
   if not detached and ns.TrackerAnchoring.IsTrackerExplicitlyCollapsed() then
+    ns.TrackerFilterMenu.Close()
     clearHoveredTrackerRow()
     hideTrackerTooltip()
     frame:Hide()
@@ -153,10 +156,11 @@ syncTrackerFrame = function()
       headerText = frame.topHeaderText,
       collapseButton = frame.topHeaderMinimizeButton,
       clickButton = frame.topHeaderButton,
-      showAttachButton = true,
-      showGroupingButton = true,
-      showLockButton = true,
-      detached = true,
+        showAttachButton = true,
+        showFilterButton = true,
+        showGroupingButton = true,
+        showLockButton = true,
+        detached = true,
     })
     contentTopOffset = math.abs(STANDALONE_HEADER_OFFSET_Y) + HEADER_HEIGHT + CONTENT_TOP_GAP + DETACHED_CONTENT_TOP_MARGIN
   else
@@ -174,6 +178,7 @@ syncTrackerFrame = function()
         collapseButton = frame.topHeaderMinimizeButton,
         clickButton = frame.topHeaderButton,
         showAttachButton = false,
+        showFilterButton = false,
         showGroupingButton = false,
         showLockButton = false,
         detached = false,
@@ -197,6 +202,7 @@ syncTrackerFrame = function()
       collapseButton = frame.headerMinimizeButton,
       clickButton = frame.headerButton,
       showAttachButton = true,
+      showFilterButton = true,
       showGroupingButton = true,
       showLockButton = false,
       detached = false,
@@ -215,6 +221,9 @@ syncTrackerFrame = function()
     end
     if frame.groupingButton then
       frame.groupingButton:Hide()
+    end
+    if frame.filterButton then
+      frame.filterButton:Hide()
     end
     if frame.lockButton then
       frame.lockButton:Hide()
@@ -394,6 +403,9 @@ function Tracker.Initialize(runtimeNamespace)
         end
         ns.SetTrackerAttachmentMode("detached")
       end
+    end,
+    onToggleFilter = function()
+      ns.TrackerFilterMenu.Toggle(ns, trackerFrame.filterButton)
     end,
     onToggleDetachedLock = function()
       if isTrackerDetached() then
