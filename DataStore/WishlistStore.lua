@@ -116,6 +116,41 @@ function WishlistStore.setGroupingMode(db, characterKey, groupBy)
   return namespace.TrackerPreferences.setGroupingMode(character, groupBy)
 end
 
+function WishlistStore.getTrackerAttachmentMode(db, characterKey)
+  local character = WishlistStore.ensureCharacter(db, characterKey)
+  return namespace.TrackerPreferences.getAttachmentMode(character)
+end
+
+function WishlistStore.setTrackerAttachmentMode(db, characterKey, mode)
+  local character = WishlistStore.ensureCharacter(db, characterKey)
+  return namespace.TrackerPreferences.setAttachmentMode(character, mode)
+end
+
+function WishlistStore.getTrackerDetachedPosition(db, characterKey)
+  local character = WishlistStore.ensureCharacter(db, characterKey)
+  return namespace.TrackerPreferences.getDetachedPosition(character)
+end
+
+function WishlistStore.setTrackerDetachedPosition(db, characterKey, position)
+  local character = WishlistStore.ensureCharacter(db, characterKey)
+  return namespace.TrackerPreferences.setDetachedPosition(character, position)
+end
+
+function WishlistStore.isTrackerDetachedLocked(db, characterKey)
+  local character = WishlistStore.ensureCharacter(db, characterKey)
+  return namespace.TrackerPreferences.isDetachedLocked(character)
+end
+
+function WishlistStore.setTrackerDetachedLocked(db, characterKey, locked)
+  local character = WishlistStore.ensureCharacter(db, characterKey)
+  return namespace.TrackerPreferences.setDetachedLocked(character, locked)
+end
+
+function WishlistStore.toggleTrackerDetachedLocked(db, characterKey)
+  local character = WishlistStore.ensureCharacter(db, characterKey)
+  return namespace.TrackerPreferences.toggleDetachedLocked(character)
+end
+
 function WishlistStore.setGroupCollapsed(db, characterKey, groupBy, groupKey, collapsed)
   local character = WishlistStore.ensureCharacter(db, characterKey)
   namespace.TrackerPreferences.setGroupCollapsed(character, groupBy, groupKey, collapsed)

@@ -118,6 +118,40 @@ function namespace.SetTrackerGroupingMode(groupBy)
   return getTrackerGroupingMode()
 end
 
+function namespace.GetTrackerAttachmentMode()
+  return namespace.WishlistStore.getTrackerAttachmentMode(getCurrentDb(), getCharacterKey())
+end
+
+function namespace.SetTrackerAttachmentMode(mode)
+  local attachmentMode = namespace.WishlistStore.setTrackerAttachmentMode(getCurrentDb(), getCharacterKey(), mode)
+  namespace.RefreshTracker()
+  return attachmentMode
+end
+
+function namespace.GetTrackerDetachedPosition()
+  return namespace.WishlistStore.getTrackerDetachedPosition(getCurrentDb(), getCharacterKey())
+end
+
+function namespace.SetTrackerDetachedPosition(position)
+  return namespace.WishlistStore.setTrackerDetachedPosition(getCurrentDb(), getCharacterKey(), position)
+end
+
+function namespace.IsTrackerDetachedLocked()
+  return namespace.WishlistStore.isTrackerDetachedLocked(getCurrentDb(), getCharacterKey())
+end
+
+function namespace.SetTrackerDetachedLocked(locked)
+  local isLocked = namespace.WishlistStore.setTrackerDetachedLocked(getCurrentDb(), getCharacterKey(), locked)
+  namespace.RefreshTracker()
+  return isLocked
+end
+
+function namespace.ToggleTrackerDetachedLocked()
+  local isLocked = namespace.WishlistStore.toggleTrackerDetachedLocked(getCurrentDb(), getCharacterKey())
+  namespace.RefreshTracker()
+  return isLocked
+end
+
 function namespace.RemoveTrackedItem(itemID)
   namespace.WishlistStore.removeItem(getCurrentDb(), getCharacterKey(), itemID)
   namespace.RefreshAllImmediate()

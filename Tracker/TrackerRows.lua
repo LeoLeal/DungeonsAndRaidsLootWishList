@@ -183,7 +183,17 @@ function TrackerRows.RenderGroupHeader(runtimeNamespace, frame, row, group, item
   row.tooltipRef = nil
   row.itemID = nil
   row.tooltipFooter = nil
-  row:SetScript("OnClick", nil)
+  row:SetScript("OnClick", function(self, button)
+    if button ~= "LeftButton" then
+      return
+    end
+
+    if self.collapseButton and self.collapseButton.IsMouseOver and self.collapseButton:IsMouseOver() then
+      return
+    end
+
+    onToggle()
+  end)
   row:SetScript("OnMouseUp", nil)
   row:SetScript("OnEnter", nil)
   row:SetScript("OnLeave", nil)

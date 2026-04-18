@@ -4,8 +4,23 @@ local TrackerFrame = {}
 
 local DEFAULT_WIDTH = 260
 local HEADER_HEIGHT = 26
-local HEADER_CONTROL_GAP = 6
 local STANDALONE_HEADER_OFFSET_Y = -3
+local LOCK_BUTTON_SIZE = 18
+
+local function createTextButton(parent, onClick)
+  local button = CreateFrame("Button", nil, parent)
+  button:SetHeight(16)
+  button.Text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  button.Text:SetPoint("CENTER")
+  button:SetScript("OnClick", onClick)
+  button:SetScript("OnEnter", function(self)
+    self.Text:SetFontObject(GameFontNormalSmall)
+  end)
+  button:SetScript("OnLeave", function(self)
+    self.Text:SetFontObject(GameFontHighlightSmall)
+  end)
+  return button
+end
 
 function TrackerFrame.Create(runtimeNamespace, callbacks)
   local trackerFrame = CreateFrame("Frame", "LootWishListTrackerFrame", UIParent)
@@ -28,29 +43,20 @@ function TrackerFrame.Create(runtimeNamespace, callbacks)
   trackerFrame.headerText = trackerFrame.headerFrame.Text or trackerFrame.headerFrame.HeaderText
   trackerFrame.headerMinimizeButton = trackerFrame.headerFrame.MinimizeButton
 
-  trackerFrame.groupingButton = CreateFrame("Button", nil, trackerFrame.headerFrame)
-  trackerFrame.groupingButton:SetHeight(16)
-  trackerFrame.groupingButton.Text = trackerFrame.groupingButton:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  trackerFrame.groupingButton.Text:SetPoint("CENTER")
+  trackerFrame.groupingButton = createTextButton(trackerFrame, callbacks.onToggleGrouping)
   trackerFrame.groupingButton.Text:SetText(runtimeNamespace.TrackerHeaders.GetGroupingButtonText(runtimeNamespace))
-  trackerFrame.groupingButton:SetScript("OnClick", callbacks.onToggleGrouping)
-  trackerFrame.groupingButton:SetScript("OnEnter", function(self)
-    self.Text:SetFontObject(GameFontNormalSmall)
-  end)
-  trackerFrame.groupingButton:SetScript("OnLeave", function(self)
-    self.Text:SetFontObject(GameFontHighlightSmall)
-  end)
-  trackerFrame.contentFrame = CreateFrame("Frame", nil, trackerFrame)
+  trackerFrame.groupingButton:SetWidth(trackerFrame.groupingButton.Text:GetStringWidth() + 12)
 
-  if trackerFrame.groupingButton and trackerFrame.groupingButton.Text then
-    trackerFrame.groupingButton:SetWidth(trackerFrame.groupingButton.Text:GetStringWidth() + 12)
-    trackerFrame.groupingButton:ClearAllPoints()
-    if trackerFrame.headerMinimizeButton then
-      trackerFrame.groupingButton:SetPoint("RIGHT", trackerFrame.headerMinimizeButton, "LEFT", -HEADER_CONTROL_GAP, 0)
-    else
-      trackerFrame.groupingButton:SetPoint("RIGHT", trackerFrame.headerFrame, "RIGHT", -4, 0)
-    end
-  end
+  trackerFrame.lockButton = CreateFrame("Button", nil, trackerFrame)
+  trackerFrame.lockButton:SetScript("OnClick", callbacks.onToggleDetachedLock)
+  trackerFrame.lockButton:SetSize(LOCK_BUTTON_SIZE, LOCK_BUTTON_SIZE)
+  trackerFrame.lockButton:Hide()
+
+  trackerFrame.attachDetachButton = CreateFrame("Button", nil, trackerFrame)
+  trackerFrame.attachDetachButton:SetScript("OnClick", callbacks.onToggleAttachment)
+  trackerFrame.attachDetachButton:SetHighlightAtlas("RedButton-Highlight", "ADD")
+
+  trackerFrame.contentFrame = CreateFrame("Frame", nil, trackerFrame)
 
   if trackerFrame.topHeader and trackerFrame.topHeader.SetCollapsed and trackerFrame.topHeaderMinimizeButton and
       trackerFrame.topHeaderMinimizeButton.GetNormalTexture and trackerFrame.topHeaderMinimizeButton.GetPushedTexture then
@@ -85,23 +91,13 @@ function TrackerFrame.Create(runtimeNamespace, callbacks)
     trackerFrame.topHeaderButton:SetPoint("BOTTOMRIGHT", trackerFrame.topHeader, "BOTTOMRIGHT", 0, 0)
   end
   trackerFrame.topHeaderButton:RegisterForClicks("LeftButtonUp")
-  trackerFrame.topHeaderButton:SetScript("OnClick", callbacks.onToggleStandalone)
+  trackerFrame.topHeaderButton:SetScript("OnClick", callbacks.onToggleTopHeader)
 
   if trackerFrame.topHeaderMinimizeButton then
-    trackerFrame.topHeaderMinimizeButton:SetScript("OnClick", callbacks.onToggleStandalone)
+    trackerFrame.topHeaderMinimizeButton:SetScript("OnClick", callbacks.onToggleTopHeader)
   end
 
   trackerFrame.headerButton = CreateFrame("Button", nil, trackerFrame.headerFrame)
-  trackerFrame.headerButton:SetPoint("TOPLEFT", trackerFrame.headerFrame, "TOPLEFT", 0, 0)
-  trackerFrame.headerButton:SetPoint("BOTTOMLEFT", trackerFrame.headerFrame, "BOTTOMLEFT", 0, 0)
-  if trackerFrame.groupingButton then
-    trackerFrame.headerButton:SetPoint("RIGHT", trackerFrame.groupingButton, "LEFT", -HEADER_CONTROL_GAP, 0)
-  elseif trackerFrame.headerMinimizeButton then
-    trackerFrame.headerButton:SetPoint("RIGHT", trackerFrame.headerMinimizeButton, "LEFT", 0, 0)
-  else
-    trackerFrame.headerButton:SetPoint("TOPRIGHT", trackerFrame.headerFrame, "TOPRIGHT", 0, 0)
-    trackerFrame.headerButton:SetPoint("BOTTOMRIGHT", trackerFrame.headerFrame, "BOTTOMRIGHT", 0, 0)
-  end
   trackerFrame.headerButton:RegisterForClicks("LeftButtonUp")
   trackerFrame.headerButton:SetScript("OnClick", callbacks.onToggleWishlist)
 

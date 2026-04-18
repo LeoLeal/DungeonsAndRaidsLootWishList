@@ -14,12 +14,17 @@ local ROW_HEIGHT = 16
 local GROUP_SPACING = 5
 local WISHLIST_HEADER_TOP_PADDING = 10
 local CONTENT_TOP_GAP = 4
+local DETACHED_CONTENT_TOP_MARGIN = 4
 local STANDALONE_HEADER_OFFSET_Y = -3
 local FRAME_LEFT_PADDING = 10
 local STANDALONE_HEADER_BOTTOM_MARGIN = 10
 local POST_TRANSITION_RESYNC_DELAY = 0.15
 
 local postTransitionSyncTimer = nil
+
+local function isTrackerDetached()
+  return ns and type(ns.GetTrackerAttachmentMode) == "function" and ns.GetTrackerAttachmentMode() == "detached"
+end
 
 local function playAddAnimation(frame)
   if frame and frame.headerFrame and frame.headerFrame.AddAnim and frame.headerFrame.AddAnim.Restart then
@@ -98,20 +103,25 @@ syncTrackerFrame = function()
     return
   end
 
-  if ns.TrackerAnchoring.IsTrackerExplicitlyCollapsed() then
+  local detached = isTrackerDetached()
+  if not detached and ns.TrackerAnchoring.IsTrackerExplicitlyCollapsed() then
     clearHoveredTrackerRow()
     hideTrackerTooltip()
     frame:Hide()
     return
   end
 
-  local showStandaloneHeader = ns.TrackerAnchoring.GetAnchorMode() == "standalone"
+  local showStandaloneHeader = not detached and ns.TrackerAnchoring.GetAnchorMode(ns) == "standalone"
 
-  ns.TrackerAnchoring.AnchorTrackerFrame(frame)
+  ns.TrackerAnchoring.AnchorTrackerFrame(frame, ns)
   frame:Show()
+  frame.useTopHeaderTextInset = detached == true
 
   if frame.topHeader then
-    frame.topHeader:SetShown(showStandaloneHeader)
+    frame.topHeader:SetShown(showStandaloneHeader or detached)
+  end
+  if frame.topHeaderButton then
+    frame.topHeaderButton:SetShown(showStandaloneHeader or detached)
   end
 
   local headerText = frame.headerText or frame.headerFrame.Text or frame.headerFrame.HeaderText
@@ -119,34 +129,96 @@ syncTrackerFrame = function()
     headerText:SetText(ns.GetText("LOOT_WISHLIST"))
   end
 
-  if frame.groupingButton and frame.groupingButton.Text then
-    frame.groupingButton.Text:SetText(ns.TrackerHeaders.GetGroupingButtonText(ns))
-    frame.groupingButton:SetWidth(frame.groupingButton.Text:GetStringWidth() + 12)
-  end
-
   if frame.topHeaderText then
-    frame.topHeaderText:SetText(_G.TRACKER_ALL_OBJECTIVES or "All Objectives")
+    if detached then
+      frame.topHeaderText:SetText(ns.GetText("LOOT_WISHLIST"))
+    else
+      frame.topHeaderText:SetText(_G.TRACKER_ALL_OBJECTIVES or "All Objectives")
+    end
   end
 
-  frame.headerFrame:ClearAllPoints()
-  if showStandaloneHeader then
-    frame.headerFrame:SetPoint("TOPLEFT", frame.topHeader, "BOTTOMLEFT", 0, -STANDALONE_HEADER_BOTTOM_MARGIN)
-    frame.headerFrame:SetPoint("TOPRIGHT", frame.topHeader, "BOTTOMRIGHT", 0, -STANDALONE_HEADER_BOTTOM_MARGIN)
+  ns.TrackerHeaders.SetWishlistCollapse(frame, frame.lootWishlistCollapsed)
+
+  local contentTopOffset = 0
+  if detached then
+    if frame.headerFrame then
+      frame.headerFrame:Hide()
+    end
+    if frame.headerButton then
+      frame.headerButton:Hide()
+    end
+    ns.TrackerHeaders.ApplyTopHeaderButtonState(frame, frame.lootWishlistCollapsed)
+    ns.TrackerHeaders.LayoutHeaderControls(frame, ns, {
+      header = frame.topHeader,
+      headerText = frame.topHeaderText,
+      collapseButton = frame.topHeaderMinimizeButton,
+      clickButton = frame.topHeaderButton,
+      showAttachButton = true,
+      showGroupingButton = true,
+      showLockButton = true,
+      detached = true,
+    })
+    contentTopOffset = math.abs(STANDALONE_HEADER_OFFSET_Y) + HEADER_HEIGHT + CONTENT_TOP_GAP + DETACHED_CONTENT_TOP_MARGIN
   else
-    frame.headerFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -WISHLIST_HEADER_TOP_PADDING)
-    frame.headerFrame:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, -WISHLIST_HEADER_TOP_PADDING)
+    if frame.topHeader then
+      frame.topHeader:SetShown(showStandaloneHeader)
+    end
+    if frame.topHeaderButton then
+      frame.topHeaderButton:SetShown(showStandaloneHeader)
+    end
+    if showStandaloneHeader then
+      ns.TrackerHeaders.ApplyStandaloneHeaderButtonState(frame)
+      ns.TrackerHeaders.LayoutHeaderControls(frame, ns, {
+        header = frame.topHeader,
+        headerText = frame.topHeaderText,
+        collapseButton = frame.topHeaderMinimizeButton,
+        clickButton = frame.topHeaderButton,
+        showAttachButton = false,
+        showGroupingButton = false,
+        showLockButton = false,
+        detached = false,
+      })
+    end
+
+    frame.headerFrame:ClearAllPoints()
+    if showStandaloneHeader then
+      frame.headerFrame:SetPoint("TOPLEFT", frame.topHeader, "BOTTOMLEFT", 0, -STANDALONE_HEADER_BOTTOM_MARGIN)
+      frame.headerFrame:SetPoint("TOPRIGHT", frame.topHeader, "BOTTOMRIGHT", 0, -STANDALONE_HEADER_BOTTOM_MARGIN)
+      contentTopOffset = math.abs(STANDALONE_HEADER_OFFSET_Y) + HEADER_HEIGHT + STANDALONE_HEADER_BOTTOM_MARGIN + HEADER_HEIGHT + CONTENT_TOP_GAP
+    else
+      frame.headerFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -WISHLIST_HEADER_TOP_PADDING)
+      frame.headerFrame:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, -WISHLIST_HEADER_TOP_PADDING)
+      contentTopOffset = WISHLIST_HEADER_TOP_PADDING + HEADER_HEIGHT + CONTENT_TOP_GAP
+    end
+
+    ns.TrackerHeaders.LayoutHeaderControls(frame, ns, {
+      header = frame.headerFrame,
+      headerText = headerText,
+      collapseButton = frame.headerMinimizeButton,
+      clickButton = frame.headerButton,
+      showAttachButton = true,
+      showGroupingButton = true,
+      showLockButton = false,
+      detached = false,
+    })
   end
 
-  local contentTopOffset = showStandaloneHeader and
-    (math.abs(STANDALONE_HEADER_OFFSET_Y) + HEADER_HEIGHT + STANDALONE_HEADER_BOTTOM_MARGIN + HEADER_HEIGHT + CONTENT_TOP_GAP) or
-    (WISHLIST_HEADER_TOP_PADDING + HEADER_HEIGHT + CONTENT_TOP_GAP)
-
-  ns.TrackerHeaders.ApplyStandaloneHeaderButtonState(frame)
-
-  if showStandaloneHeader and frame.lootWishlistStandaloneHidden then
+  if showStandaloneHeader and not detached and frame.lootWishlistStandaloneHidden then
     clearHoveredTrackerRow()
     hideTrackerTooltip()
     frame.headerFrame:Hide()
+    if frame.headerButton then
+      frame.headerButton:Hide()
+    end
+    if frame.attachDetachButton then
+      frame.attachDetachButton:Hide()
+    end
+    if frame.groupingButton then
+      frame.groupingButton:Hide()
+    end
+    if frame.lockButton then
+      frame.lockButton:Hide()
+    end
     if frame.contentFrame then
       frame.contentFrame:Hide()
       frame.contentFrame:SetHeight(0)
@@ -156,7 +228,17 @@ syncTrackerFrame = function()
     return
   end
 
-  frame.headerFrame:Show()
+  if detached then
+    frame.headerFrame:Hide()
+    if frame.headerButton then
+      frame.headerButton:Hide()
+    end
+  else
+    frame.headerFrame:Show()
+    if frame.headerButton then
+      frame.headerButton:Show()
+    end
+  end
   if frame.contentFrame then
     frame.contentFrame:ClearAllPoints()
     frame.contentFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", FRAME_LEFT_PADDING, -contentTopOffset)
@@ -293,11 +375,33 @@ function Tracker.Initialize(runtimeNamespace)
       local nextMode = ns.GetTrackerGroupingMode() == "slot" and "source" or "slot"
       ns.SetTrackerGroupingMode(nextMode)
     end,
-    onToggleStandalone = function()
-      ns.TrackerHeaders.ToggleStandaloneCollapse(trackerFrame, syncTrackerFrame)
+    onToggleTopHeader = function()
+      if isTrackerDetached() then
+        ns.TrackerHeaders.ToggleWishlistCollapse(trackerFrame, syncTrackerFrame)
+      else
+        ns.TrackerHeaders.ToggleStandaloneCollapse(trackerFrame, syncTrackerFrame)
+      end
     end,
     onToggleWishlist = function()
       ns.TrackerHeaders.ToggleWishlistCollapse(trackerFrame, syncTrackerFrame)
+    end,
+    onToggleAttachment = function()
+      if isTrackerDetached() then
+        ns.SetTrackerAttachmentMode("attached")
+      else
+        if not ns.GetTrackerDetachedPosition() then
+          ns.TrackerAnchoring.SaveDetachedPosition(ns, trackerFrame)
+        end
+        ns.SetTrackerAttachmentMode("detached")
+      end
+    end,
+    onToggleDetachedLock = function()
+      if isTrackerDetached() then
+        if not ns.IsTrackerDetachedLocked() then
+          ns.TrackerAnchoring.SaveDetachedPosition(ns, trackerFrame)
+        end
+        ns.ToggleTrackerDetachedLocked()
+      end
     end,
   })
 

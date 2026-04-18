@@ -4,6 +4,100 @@ local TrackerAnchoring = {}
 
 local DEFAULT_WIDTH = 260
 local TRACKER_SECTION_GAP = -10
+local DETACHED_ANCHOR_POINT = "TOPLEFT"
+local DETACHED_RELATIVE_POINT = "TOPLEFT"
+
+local function getAttachmentMode(runtimeNamespace)
+  if runtimeNamespace and type(runtimeNamespace.GetTrackerAttachmentMode) == "function" then
+    return runtimeNamespace.GetTrackerAttachmentMode()
+  end
+
+  return "attached"
+end
+
+local function isDetached(runtimeNamespace)
+  return getAttachmentMode(runtimeNamespace) == "detached"
+end
+
+local function buildDetachedPosition(frame)
+  if not frame or not UIParent then
+    return nil
+  end
+
+  local frameLeft = frame.GetLeft and frame:GetLeft() or nil
+  local frameTop = frame.GetTop and frame:GetTop() or nil
+  local parentLeft = UIParent.GetLeft and UIParent:GetLeft() or 0
+  local parentTop = UIParent.GetTop and UIParent:GetTop() or nil
+  if not frameLeft or not frameTop or not parentTop then
+    return nil
+  end
+
+  return {
+    point = DETACHED_ANCHOR_POINT,
+    relativePoint = DETACHED_RELATIVE_POINT,
+    x = frameLeft - parentLeft,
+    y = frameTop - parentTop,
+  }
+end
+
+local function applyDetachedPosition(runtimeNamespace, frame)
+  local detachedPosition = runtimeNamespace and runtimeNamespace.GetTrackerDetachedPosition and
+      runtimeNamespace.GetTrackerDetachedPosition() or nil
+  if type(detachedPosition) ~= "table" or not UIParent then
+    return false
+  end
+
+  frame:SetPoint(detachedPosition.point, UIParent, detachedPosition.relativePoint, detachedPosition.x, detachedPosition.y)
+  return true
+end
+
+local function installDetachedDragScripts(frame)
+  if not frame or frame.detachedDragScriptsInstalled or not frame.topHeaderButton then
+    return
+  end
+
+  frame.detachedDragScriptsInstalled = true
+  frame.topHeaderButton.trackerFrame = frame
+  frame.topHeaderButton:RegisterForDrag("LeftButton")
+  frame.topHeaderButton:SetScript("OnDragStart", function(self)
+    local owner = self.trackerFrame
+    if not owner or not owner.detachedDragEnabled then
+      return
+    end
+
+    owner:StartMoving()
+  end)
+  frame.topHeaderButton:SetScript("OnDragStop", function(self)
+    local owner = self.trackerFrame
+    if not owner then
+      return
+    end
+
+    owner:StopMovingOrSizing()
+    if owner.detachedDragEnabled then
+      TrackerAnchoring.SaveDetachedPosition(owner.runtimeNamespace, owner)
+    end
+  end)
+end
+
+local function applyDetachedDragState(runtimeNamespace, frame)
+  if not frame then
+    return
+  end
+
+  frame.runtimeNamespace = runtimeNamespace
+  frame:SetClampedToScreen(true)
+  installDetachedDragScripts(frame)
+
+  local dragEnabled = isDetached(runtimeNamespace) and runtimeNamespace and
+      type(runtimeNamespace.IsTrackerDetachedLocked) == "function" and not runtimeNamespace.IsTrackerDetachedLocked()
+
+  frame.detachedDragEnabled = dragEnabled == true
+  frame:SetMovable(frame.detachedDragEnabled)
+  if not frame.detachedDragEnabled then
+    frame:StopMovingOrSizing()
+  end
+end
 
 local function isTrackerInDefaultPosition()
   return ObjectiveTrackerFrame and type(ObjectiveTrackerFrame.IsInDefaultPosition) == "function" and
@@ -130,7 +224,11 @@ function TrackerAnchoring.HasVisibleNativeTrackerSections()
   return anchorTarget ~= nil
 end
 
-function TrackerAnchoring.GetAnchorMode()
+function TrackerAnchoring.GetAnchorMode(runtimeNamespace)
+  if isDetached(runtimeNamespace) then
+    return "detached"
+  end
+
   if TrackerAnchoring.IsNativeTrackerShown() and TrackerAnchoring.HasVisibleNativeTrackerSections() then
     return "append"
   end
@@ -138,16 +236,25 @@ function TrackerAnchoring.GetAnchorMode()
   return "standalone"
 end
 
-function TrackerAnchoring.AnchorTrackerFrame(frame)
+function TrackerAnchoring.SaveDetachedPosition(runtimeNamespace, frame)
+  local detachedPosition = buildDetachedPosition(frame)
+  if detachedPosition and runtimeNamespace and type(runtimeNamespace.SetTrackerDetachedPosition) == "function" then
+    runtimeNamespace.SetTrackerDetachedPosition(detachedPosition)
+  end
+
+  return detachedPosition
+end
+
+function TrackerAnchoring.AnchorTrackerFrame(frame, runtimeNamespace)
   local nativeParent = getNativeTrackerReferenceFrame()
   local standaloneParent = getStandaloneTrackerReferenceFrame()
   if not frame or (not nativeParent and not standaloneParent) then
     return
   end
 
-  local anchorMode = TrackerAnchoring.GetAnchorMode()
+  local anchorMode = TrackerAnchoring.GetAnchorMode(runtimeNamespace)
   local width = nil
-  if anchorMode == "standalone" then
+  if anchorMode == "standalone" or anchorMode == "detached" then
     width = getStandaloneReferenceWidth(standaloneParent, nativeParent)
   else
     width = getReferenceWidth(nativeParent, standaloneParent)
@@ -161,6 +268,27 @@ function TrackerAnchoring.AnchorTrackerFrame(frame)
   end
 
   frame:ClearAllPoints()
+
+  applyDetachedDragState(runtimeNamespace, frame)
+
+  if anchorMode == "detached" then
+    if not applyDetachedPosition(runtimeNamespace, frame) then
+      if standaloneParent then
+        if isTrackerInDefaultPosition() and standaloneParent == UIParentRightManagedFrameContainer then
+          local offsetX, offsetY = getRelativeTopRightOffset(ObjectiveTrackerFrame, standaloneParent)
+          frame:SetPoint("TOPRIGHT", standaloneParent, "TOPRIGHT", offsetX, offsetY)
+        else
+          frame:SetPoint("TOPLEFT", standaloneParent, "TOPLEFT", 0, 0)
+          if ObjectiveTrackerFrame then
+            frame:SetPoint("TOPRIGHT", ObjectiveTrackerFrame, "TOPRIGHT", 0, 0)
+          end
+        end
+      else
+        frame:SetPoint(DETACHED_ANCHOR_POINT, UIParent, DETACHED_RELATIVE_POINT, 0, 0)
+      end
+    end
+    return
+  end
 
   if anchorMode == "append" and nativeParent then
     local anchorTarget, _, anchorLeft = TrackerAnchoring.GetBottommostVisibleChild(nativeParent)
