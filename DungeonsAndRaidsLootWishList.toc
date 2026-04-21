@@ -1,9 +1,9 @@
-## Interface: 120001
+## Interface: 120001, 120005
 ## Title: Dungeons and Raids Loot WishList
 ## Notes: Adventure Guide loot wishlist and tracker integration
 ## Notes-ruRU: Позволяет управлять списками желаемой добычи
 ## Author: Leonardo Leal
-## Version: v1.5.0
+## Version: v1.5.1
 ## SavedVariablesPerCharacter: LootWishListDB
 ## IconTexture: Interface\AddOns\DungeonsAndRaidsLootWishList\logo
 
