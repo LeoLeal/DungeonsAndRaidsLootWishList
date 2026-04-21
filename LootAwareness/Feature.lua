@@ -2,6 +2,12 @@ local _, namespace = ...
 
 local LootAwareness = {}
 
+function LootAwareness.Initialize(runtimeNamespace)
+  if runtimeNamespace and runtimeNamespace.RollBadgeLifecycle then
+    runtimeNamespace.RollBadgeLifecycle.Initialize(runtimeNamespace)
+  end
+end
+
 function LootAwareness.BuildAlertRecord(runtimeNamespace, ...)
   return runtimeNamespace.AlertPresenter.BuildLootAlertRecord(runtimeNamespace, ...)
 end

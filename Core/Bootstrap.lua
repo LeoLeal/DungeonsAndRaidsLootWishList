@@ -432,6 +432,7 @@ function Bootstrap.HandleEvent(runtimeNamespace, event, ...)
     runtimeNamespace.Tracker.PrimeTrackedEncounterData(runtimeNamespace)
     runtimeNamespace.Tracker.Initialize(runtimeNamespace)
     runtimeNamespace.AdventureGuide.Initialize(runtimeNamespace)
+    runtimeNamespace.LootAwareness.Initialize(runtimeNamespace)
     Bootstrap.RegisterEvents(runtimeNamespace)
     runtimeNamespace.RefreshAllImmediate()
     return true
@@ -451,13 +452,7 @@ function Bootstrap.HandleEvent(runtimeNamespace, event, ...)
 
   if event == "START_LOOT_ROLL" then
     local rollID = ...
-    if not InCombatLockdown() then
-      runtimeNamespace.LootAwareness.HandleStartLootRoll(runtimeNamespace, rollID)
-    else
-      runtimeNamespace.QueueAfterCombat(function()
-        runtimeNamespace.LootAwareness.HandleStartLootRoll(runtimeNamespace, rollID)
-      end)
-    end
+    runtimeNamespace.LootAwareness.HandleStartLootRoll(runtimeNamespace, rollID)
     return true
   end
 

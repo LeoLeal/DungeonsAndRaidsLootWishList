@@ -10,9 +10,17 @@ local LOOT_ROLL_BADGE_GLOW_PAD_X = 120
 local LOOT_ROLL_BADGE_GLOW_PAD_Y = 16
 
 local function hideRollBadge(frame)
-  if frame and frame.LootWishListBadge then
-    frame.LootWishListBadge:Hide()
+  if not frame or not frame.LootWishListBadge then
+    return
   end
+
+  frame.LootWishListBadge.rollID = nil
+  frame.LootWishListBadge.itemID = nil
+  if frame.LootWishListBadge.text then
+    frame.LootWishListBadge.text:SetText("")
+  end
+  frame.LootWishListBadge:SetWidth(0)
+  frame.LootWishListBadge:Hide()
 end
 
 local function ensureRollBadge(frame)
@@ -54,36 +62,76 @@ local function ensureRollBadge(frame)
   return badge
 end
 
-function RollBadgeView.ShowForRoll(runtimeNamespace, rollID)
-  local frame = runtimeNamespace.RollFrameLocator.findById(rollID)
-  if not frame then
-    return
-  end
-
-  if type(GetLootRollItemLink) ~= "function" then
-    hideRollBadge(frame)
-    return
-  end
-
-  local itemLink = GetLootRollItemLink(rollID)
-  local itemID = runtimeNamespace.ItemResolver.getItemIdFromLink(itemLink)
-  if not itemID or not runtimeNamespace.IsTrackedItem(itemID) then
-    hideRollBadge(frame)
-    return
-  end
-
+local function applyTrackedBadge(runtimeNamespace, frame, rollID, itemID)
   local badge = ensureRollBadge(frame)
   if not badge then
-    return
+    hideRollBadge(frame)
+    return false
   end
 
   local tags = runtimeNamespace.GetOrderedAssignedTags(itemID)
+  badge.rollID = rollID
+  badge.itemID = itemID
   badge.text:SetText(runtimeNamespace.GetText("WISHLIST_WITH_TAGS", runtimeNamespace.FormatWishlistTagList(tags)))
   badge:SetWidth((LOOT_ROLL_BADGE_SIDE_PADDING * 2) + LOOT_ROLL_BADGE_ICON_SIZE + LOOT_ROLL_BADGE_GAP +
     badge.text:GetStringWidth())
   badge:ClearAllPoints()
   badge:SetPoint("TOP", frame, "TOP", 0, 12)
   badge:Show()
+  return true
+end
+
+function RollBadgeView.PrepareFrame(frame)
+  local badge = ensureRollBadge(frame)
+  if badge then
+    hideRollBadge(frame)
+  end
+
+  return badge
+end
+
+function RollBadgeView.HideForFrame(frame)
+  hideRollBadge(frame)
+end
+
+function RollBadgeView.SyncFrame(runtimeNamespace, frame)
+  if not frame then
+    return false
+  end
+
+  if frame.IsShown and not frame:IsShown() then
+    hideRollBadge(frame)
+    return false
+  end
+
+  local rollID = frame.rollID
+  if type(rollID) ~= "number" then
+    hideRollBadge(frame)
+    return false
+  end
+
+  if type(GetLootRollItemLink) ~= "function" then
+    hideRollBadge(frame)
+    return false
+  end
+
+  local itemLink = GetLootRollItemLink(rollID)
+  local itemID = runtimeNamespace.ItemResolver.getItemIdFromLink(itemLink)
+  if not itemID or not runtimeNamespace.IsTrackedItem(itemID) then
+    hideRollBadge(frame)
+    return false
+  end
+
+  return applyTrackedBadge(runtimeNamespace, frame, rollID, itemID)
+end
+
+function RollBadgeView.ShowForRoll(runtimeNamespace, rollID)
+  local frame = runtimeNamespace.RollFrameLocator.findById(rollID)
+  if not frame then
+    return false
+  end
+
+  return RollBadgeView.SyncFrame(runtimeNamespace, frame)
 end
 
 if type(namespace) == "table" then

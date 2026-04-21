@@ -56,5 +56,6 @@ LootAwareness/RecentSelfLoot.lua
 LootAwareness/LootEventHandlers.lua
 LootAwareness/RollBadge/RollFrameLocator.lua
 LootAwareness/RollBadge/RollBadgeView.lua
+LootAwareness/RollBadge/RollBadgeLifecycle.lua
 LootAwareness/Feature.lua
 Core/Bootstrap.lua

@@ -3,7 +3,7 @@ local _, namespace = ...
 local LootEventHandlers = {}
 
 function LootEventHandlers.HandleStartLootRoll(runtimeNamespace, rollID)
-  runtimeNamespace.RollBadgeView.ShowForRoll(runtimeNamespace, rollID)
+  runtimeNamespace.RollBadgeLifecycle.SyncRoll(runtimeNamespace, rollID)
 end
 
 function LootEventHandlers.HandleChatLoot(runtimeNamespace, message, playerNameEvent)
