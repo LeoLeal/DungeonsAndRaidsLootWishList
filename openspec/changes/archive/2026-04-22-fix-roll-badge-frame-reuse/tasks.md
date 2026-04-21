@@ -14,4 +14,4 @@
 
 - [x] 3.1 Remove the blanket `QueueAfterCombat` deferral from loot-roll badge decoration so visible tracked rolls can synchronize immediately from current frame state.
 - [x] 3.2 Adjust `START_LOOT_ROLL` handling so early event work acts only as a sync hint and cannot reapply stale badge state to a recycled frame.
-- [ ] 3.3 Validate overflow scenarios where active rolls exceed visible frames, including queued tracked-roll promotion, recycled untracked rolls, duplicate tracked drops, and tracked rolls that become visible during combat.
+- [x] 3.3 Validate overflow scenarios where active rolls exceed visible frames, including queued tracked-roll promotion, recycled untracked rolls, duplicate tracked drops, and tracked rolls that become visible during combat.
