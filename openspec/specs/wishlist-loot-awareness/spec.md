@@ -1,9 +1,7 @@
 ## Purpose
 
 Define how the addon reacts to loot events, loot roll frames, and current character possession updates for tracked items.
-
 ## Requirements
-
 ### Requirement: Player loot updates remembered item level without a popup
 
 When the active character loots a tracked item, the addon SHALL NOT show a tracked-loot popup for the active character's own tracked-item loot, and MAY suppress a simultaneous same-item other-player alert when the addon has just recorded recent self loot for that tracked item. The addon SHALL NOT persist or update remembered best looted item level for that wishlist entry as part of self-loot handling.
@@ -22,21 +20,33 @@ When the active character loots a tracked item, the addon SHALL NOT show a track
 
 ### Requirement: Other-player tracked-item loot shows an addon-owned alert without changing local ownership state
 
-When another player loots an item that matches the active character's tracked wishlist, the addon SHALL normalize the relevant alert data immediately into addon-owned values and SHALL show an addon-owned tracked-loot alert popup identifying the looting player and the item when the UI is in a safe state for dialog display. If the UI is already in a safe state, the alert SHALL appear immediately. The popup SHALL preserve the current StaticPopup-style user experience while staying fully addon-owned, including player-name text, item icon, item name, dismiss interaction, and item tooltip on hover. Loot matching SHALL continue to use stable tracked-item identity rather than variant-specific full-link equality, while alert normalization SHALL use the dropped item link extracted from the readable loot event as the alert record's display link so the popup presents the actual dropped variant. The addon SHALL NOT change the active character's possession indicator or persist remembered best-looted item-level history based on another player's loot. Loot-event handling SHALL process incoming loot payloads immediately at the event boundary rather than storing or replaying raw payloads later, SHALL use recent-self-loot correlation instead of comparing the reported looter name against the active player name, SHALL determine whether the `CHAT_MSG_LOOT` payload is safe to inspect before performing any string comparison or pattern matching on it, and SHALL NOT treat generic error suppression around unsafe payload parsing as an acceptable success path. LootAwareness-owned modules SHALL own loot-event parsing, tracked-item matching, recent-self-loot suppression, alert coordination, and loot-roll reaction coordination, while Core bootstrap code SHALL remain limited to initialization and top-level event wiring.
+When another player loots an alertable item that matches the active character's tracked wishlist, the addon SHALL normalize the relevant alert data immediately into addon-owned values and SHALL show an addon-owned tracked-loot alert popup identifying the looting player and the item when the UI is in a safe state for dialog display. If the UI is already in a safe state, the alert SHALL appear immediately. The addon SHALL NOT queue or show a tracked-loot alert for Bonus loot events, even when the Bonus loot item matches the active character's wishlist, because Bonus loot is not tradeable to the active character. The popup SHALL preserve the current StaticPopup-style user experience while staying fully addon-owned, including player-name text, item icon, item name, dismiss interaction, and item tooltip on hover. Loot matching SHALL continue to use stable tracked-item identity rather than variant-specific full-link equality, while alert normalization SHALL use the dropped item link extracted from the readable loot event as the alert record's display link so the popup presents the actual dropped variant. The addon SHALL NOT change the active character's possession indicator or persist remembered best-looted item-level history based on another player's loot. Loot-event handling SHALL process incoming loot payloads immediately at the event boundary rather than storing or replaying raw payloads later, SHALL use recent-self-loot correlation instead of comparing the reported looter name against the active player name, SHALL determine whether the `CHAT_MSG_LOOT` payload is safe to inspect before performing any string comparison or pattern matching on it, SHALL classify non-alertable Bonus loot before alert record construction, and SHALL NOT treat generic error suppression around unsafe payload parsing as an acceptable success path. LootAwareness-owned modules SHALL own loot-event parsing, tracked-item matching, recent-self-loot suppression, Bonus loot suppression, alert coordination, and loot-roll reaction coordination, while Core bootstrap code SHALL remain limited to initialization and top-level event wiring.
 
 #### Scenario: Another player loots a tracked item while UI state is safe
 
-- **WHEN** another player loots an item that matches one of the active character's tracked wishlist items and the UI is already in a safe state for dialog display
+- **WHEN** another player loots an alertable item that matches one of the active character's tracked wishlist items and the UI is already in a safe state for dialog display
 - **THEN** the addon shows the addon-owned tracked-loot alert popup naming the player and presenting the dropped item variant extracted from the readable loot event
 
 #### Scenario: Another player loots a tracked item during unsafe UI state
 
-- **WHEN** another player loots an item that matches one of the active character's tracked wishlist items while the UI is not in a safe state for dialog display
+- **WHEN** another player loots an alertable item that matches one of the active character's tracked wishlist items while the UI is not in a safe state for dialog display
 - **THEN** the addon shows the addon-owned tracked-loot alert popup after the UI returns to a safe state while preserving the dropped item variant extracted from the original readable event
+
+#### Scenario: Other-player Bonus loot is ignored
+
+- **WHEN** the addon receives a readable loot-chat message in the form `<Player> receives Bonus loot: <Item>`
+- **AND** `<Item>` matches one of the active character's tracked wishlist items
+- **THEN** the addon does not queue or show a tracked-loot alert dialog
+- **AND** the addon does not build an alert record for that Bonus loot event
+
+#### Scenario: Ordinary other-player loot remains alertable
+
+- **WHEN** another player receives an ordinary alertable loot drop for an item matching one of the active character's tracked wishlist items
+- **THEN** the addon remains eligible to show the addon-owned tracked-loot alert popup for that event
 
 #### Scenario: Alert popup shows dropped item icon and name
 
-- **WHEN** the addon shows a tracked-loot alert popup for another player's loot and the normalized alert record contains the extracted dropped item link
+- **WHEN** the addon shows a tracked-loot alert popup for another player's alertable loot and the normalized alert record contains the extracted dropped item link
 - **THEN** the popup displays that dropped variant's icon and item name
 
 #### Scenario: Hovering alert item shows tooltip for the dropped variant
@@ -56,7 +66,7 @@ When another player loots an item that matches the active character's tracked wi
 
 #### Scenario: Loot-event processing normalizes matching identity and display link
 
-- **WHEN** the relevant loot event arrives for another player's tracked item loot
+- **WHEN** the relevant loot event arrives for another player's alertable tracked item loot
 - **THEN** the addon derives the stable tracked-item identity immediately for wishlist matching
 - **AND** the addon preserves the extracted dropped item link in the alert record for later alert presentation
 
@@ -171,3 +181,4 @@ When another player loots a tracked item, the system SHALL format the alert mess
 #### Scenario: Tracker filtering does not suppress loot alert
 - **WHEN** another player loots a tracked item that is currently hidden by the tracker tag filter
 - **THEN** the system still triggers the tracked-item loot alert for that item
+

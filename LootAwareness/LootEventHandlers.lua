@@ -15,7 +15,12 @@ function LootEventHandlers.HandleChatLoot(runtimeNamespace, message, playerNameE
     return
   end
 
-  local itemLink = runtimeNamespace.ChatLootParser.extractItemLinkFromLootMessage(message)
+  local lootMessage = runtimeNamespace.ChatLootParser.parseLootMessage(message)
+  if not lootMessage or lootMessage.alertable == false then
+    return
+  end
+
+  local itemLink = lootMessage.itemLink
   local itemID = runtimeNamespace.LootMatcher.matchTrackedItem(runtimeNamespace, itemLink)
   if not itemID then
     return
