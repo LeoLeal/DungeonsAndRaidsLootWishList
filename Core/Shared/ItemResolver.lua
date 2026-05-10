@@ -1,5 +1,12 @@
 local ItemResolver = {}
 
+local function resolveRawItemId(data)
+  if data == nil then
+    return nil
+  end
+  return data.itemID or data.itemId or data.id
+end
+
 local function trimHyperlinkPayload(itemRef)
   if type(itemRef) ~= "string" then
     return nil
@@ -22,7 +29,7 @@ function ItemResolver.getWishlistKey(itemData)
     return nil
   end
 
-  local itemId = itemData.itemID or itemData.itemId or itemData.id
+  local itemId = resolveRawItemId(itemData)
   if itemId == nil then
     return nil
   end
@@ -93,7 +100,7 @@ function ItemResolver.getTooltipRef(item)
     return itemLink
   end
 
-  local itemId = item.itemID or item.itemId or item.id
+  local itemId = resolveRawItemId(item)
   if itemId ~= nil then
     return "item:" .. tostring(itemId)
   end

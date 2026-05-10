@@ -199,6 +199,10 @@ local function migrateCharacterItems(db, characterKey, runtimeNamespace)
   return changed
 end
 
+function WishlistMigration.resolveInventoryType(itemId)
+  return resolveInventoryType(itemId)
+end
+
 function WishlistMigration.performBackfill(db, characterKey, runtimeNamespace)
   local character = runtimeNamespace.WishlistStore.ensureCharacter(db, characterKey)
   local itemsPending = {}

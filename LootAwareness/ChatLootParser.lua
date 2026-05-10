@@ -89,15 +89,6 @@ function ChatLootParser.isReadableLootValue(value)
   return type(value) == "string"
 end
 
-function ChatLootParser.extractItemLinkFromLootMessage(message)
-  local lootMessage = ChatLootParser.parseLootMessage(message)
-  if lootMessage and lootMessage.alertable ~= false then
-    return lootMessage.itemLink
-  end
-
-  return nil
-end
-
 function ChatLootParser.parseLootMessage(message)
   if not ChatLootParser.isReadableLootValue(message) or message == "" then
     return nil

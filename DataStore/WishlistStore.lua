@@ -56,19 +56,6 @@ local function resolveDefaultTagLabel()
   return "Best in slot"
 end
 
-local function resolveInventoryType(itemId)
-  if itemId == nil or type(GetItemInfoInstant) ~= "function" then
-    return nil
-  end
-
-  local _, _, _, inventoryType = GetItemInfoInstant(itemId)
-  if type(inventoryType) == "string" and inventoryType ~= "" then
-    return inventoryType
-  end
-
-  return nil
-end
-
 local function ensureTagCatalog(character)
   character.tags = type(character.tags) == "table" and character.tags or {}
   if #character.tags == 0 then
@@ -102,6 +89,17 @@ local function findCatalogTag(character, tagLabel)
   end
 
   return nil, nil
+end
+
+local function buildOrderedTagsFromLookup(character, assignedLookup)
+  local orderedTags = {}
+  for _, catalogTag in ipairs(ensureTagCatalog(character)) do
+    local normalized = normalizeTagLabel(catalogTag)
+    if normalized and assignedLookup[normalized] then
+      table.insert(orderedTags, catalogTag)
+    end
+  end
+  return orderedTags
 end
 
 local function buildAssignedTagLookup(tags)
@@ -162,15 +160,6 @@ local function getCharacter(db, characterKey)
   db.characters = db.characters or {}
   db.characters[characterKey] = ensureCharacterState(db.characters[characterKey] or {})
   return db.characters[characterKey]
-end
-
-local function getExistingCharacter(db, characterKey)
-  local character = db.characters and db.characters[characterKey] or nil
-  if type(character) ~= "table" then
-    return nil
-  end
-
-  return ensureCharacterState(character)
 end
 
 function WishlistStore.trimTagLabel(label)
@@ -273,15 +262,7 @@ function WishlistStore.assignTag(db, characterKey, itemId, tagLabel)
   local assignedLookup = buildAssignedTagLookup(getOrderedEntryTags(character, entry))
   assignedLookup[normalizeTagLabel(canonicalTag)] = true
 
-  local orderedTags = {}
-  for _, catalogTag in ipairs(ensureTagCatalog(character)) do
-    local normalized = normalizeTagLabel(catalogTag)
-    if normalized and assignedLookup[normalized] then
-      table.insert(orderedTags, catalogTag)
-    end
-  end
-
-  setOrderedEntryTags(character, entry, orderedTags)
+  setOrderedEntryTags(character, entry, buildOrderedTagsFromLookup(character, assignedLookup))
   return true, canonicalTag, entry
 end
 
@@ -300,13 +281,7 @@ function WishlistStore.unassignTag(db, characterKey, itemId, tagLabel)
   local assignedLookup = buildAssignedTagLookup(getOrderedEntryTags(character, entry))
   assignedLookup[normalizeTagLabel(canonicalTag)] = nil
 
-  local orderedTags = {}
-  for _, catalogTag in ipairs(ensureTagCatalog(character)) do
-    local normalized = normalizeTagLabel(catalogTag)
-    if normalized and assignedLookup[normalized] then
-      table.insert(orderedTags, catalogTag)
-    end
-  end
+  local orderedTags = buildOrderedTagsFromLookup(character, assignedLookup)
 
   if #orderedTags == 0 then
     WishlistStore.removeItem(db, characterKey, itemId)
@@ -364,13 +339,7 @@ function WishlistStore.deleteTag(db, characterKey, tagLabel)
     local assignedLookup = buildAssignedTagLookup(getOrderedEntryTags(character, entry))
     assignedLookup[normalizedTarget] = nil
 
-    local orderedTags = {}
-    for _, catalogTag in ipairs(ensureTagCatalog(character)) do
-      local normalized = normalizeTagLabel(catalogTag)
-      if normalized and assignedLookup[normalized] then
-        table.insert(orderedTags, catalogTag)
-      end
-    end
+    local orderedTags = buildOrderedTagsFromLookup(character, assignedLookup)
 
     if #orderedTags == 0 then
       character.items[itemKey] = nil
@@ -415,7 +384,7 @@ function WishlistStore.setItemMetadata(db, characterKey, itemId, metadata)
   end
 
   if entry.inventoryType == nil then
-    entry.inventoryType = resolveInventoryType(itemId)
+    entry.inventoryType = namespace.WishlistMigration.resolveInventoryType(itemId)
   end
 
   return entry

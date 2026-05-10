@@ -17,31 +17,6 @@ local function isValidHoveredItemRow(row)
   return type(row.tooltipRef) == "string" or type(row.itemID) == "number"
 end
 
-local function isCursorOverFrame(frame)
-  if not frame or type(frame.IsShown) ~= "function" or not frame:IsShown() then
-    return false
-  end
-
-  if type(GetCursorPosition) ~= "function" then
-    return false
-  end
-
-  local left = frame.GetLeft and frame:GetLeft() or nil
-  local right = frame.GetRight and frame:GetRight() or nil
-  local top = frame.GetTop and frame:GetTop() or nil
-  local bottom = frame.GetBottom and frame:GetBottom() or nil
-  if not left or not right or not top or not bottom then
-    return false
-  end
-
-  local scale = UIParent and UIParent.GetEffectiveScale and UIParent:GetEffectiveScale() or 1
-  local cursorX, cursorY = GetCursorPosition()
-  cursorX = cursorX / scale
-  cursorY = cursorY / scale
-
-  return cursorX >= left and cursorX <= right and cursorY >= bottom and cursorY <= top
-end
-
 local function getLiveHoveredTrackerRow(runtimeNamespace, trackerFrame)
   if type(GetMouseFocus) ~= "function" or not trackerFrame or not trackerFrame.rows then
     if not trackerFrame or not trackerFrame.rows then
@@ -57,7 +32,7 @@ local function getLiveHoveredTrackerRow(runtimeNamespace, trackerFrame)
       return hoveredTrackerRow
     end
 
-    if isCursorOverFrame(hoveredTrackerRow) then
+    if namespace.FrameUtils.IsCursorOverFrame(hoveredTrackerRow) then
       return hoveredTrackerRow
     end
   end
@@ -69,7 +44,7 @@ local function getLiveHoveredTrackerRow(runtimeNamespace, trackerFrame)
         return row
       end
 
-      if isCursorOverFrame(row) then
+      if namespace.FrameUtils.IsCursorOverFrame(row) then
         return row
       end
     end

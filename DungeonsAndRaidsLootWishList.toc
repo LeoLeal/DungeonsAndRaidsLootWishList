@@ -22,6 +22,7 @@
 Core/Shared/ItemResolver.lua
 Core/Shared/Locales.lua
 Core/Shared/TooltipCompare.lua
+Core/Shared/FrameUtils.lua
 DataStore/TrackerPreferences.lua
 DataStore/WishlistMigration.lua
 DataStore/WishlistStore.lua

@@ -58,7 +58,6 @@ local function ensureRollBadge(frame)
   badge.text:SetPoint("LEFT", badge.icon, "RIGHT", LOOT_ROLL_BADGE_GAP, 0)
 
   frame.LootWishListBadge = badge
-  frame.LootWishListTag = badge.text
   return badge
 end
 
@@ -123,15 +122,6 @@ function RollBadgeView.SyncFrame(runtimeNamespace, frame)
   end
 
   return applyTrackedBadge(runtimeNamespace, frame, rollID, itemID)
-end
-
-function RollBadgeView.ShowForRoll(runtimeNamespace, rollID)
-  local frame = runtimeNamespace.RollFrameLocator.findById(rollID)
-  if not frame then
-    return false
-  end
-
-  return RollBadgeView.SyncFrame(runtimeNamespace, frame)
 end
 
 if type(namespace) == "table" then

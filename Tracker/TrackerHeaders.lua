@@ -27,17 +27,6 @@ local LOCK_BUTTON_ATLAS = "AdventureMapIcon-Lock"
 local LOCKED_VERTEX_COLOR = { 1, 1, 1 }
 local UNLOCKED_VERTEX_COLOR = { 0.45, 0.45, 0.45 }
 
-local function getVisibleWidth(region, fallback)
-  if region and region.GetWidth then
-    local width = region:GetWidth()
-    if width and width > 0 then
-      return width
-    end
-  end
-
-  return fallback or 0
-end
-
 local function setTextButtonState(button, text)
   if not button or not button.Text then
     return
