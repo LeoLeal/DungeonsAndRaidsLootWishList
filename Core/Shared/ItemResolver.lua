@@ -66,8 +66,8 @@ function ItemResolver.normalizeItemData(itemData)
   end
 
   local inventoryType = itemData.inventoryType or itemData.invType or itemData.equipLoc
-  if (type(inventoryType) ~= "string" or inventoryType == "") and type(GetItemInfoInstant) == "function" then
-    local _, _, _, resolvedInventoryType = GetItemInfoInstant(itemId)
+  if (type(inventoryType) ~= "string" or inventoryType == "") and type(C_Item) == "table" and type(C_Item.GetItemInfoInstant) == "function" then
+    local _, _, _, resolvedInventoryType = C_Item.GetItemInfoInstant(itemId)
     inventoryType = resolvedInventoryType
   end
 

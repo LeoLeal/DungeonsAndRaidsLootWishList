@@ -244,8 +244,8 @@ function TrackerRows.RenderItemRow(runtimeNamespace, frame, row, item, callbacks
     row.text:SetFontObject(GameFontHighlight)
     row.text:SetText(item.displayText)
 
-    if item.displayLink and type(GetItemInfo) == "function" then
-      local _, _, itemQuality = GetItemInfo(item.displayLink)
+    if item.displayLink and type(C_Item) == "table" and type(C_Item.GetItemInfo) == "function" then
+      local _, _, itemQuality = C_Item.GetItemInfo(item.displayLink)
       if itemQuality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[itemQuality] then
         local qc = ITEM_QUALITY_COLORS[itemQuality]
         row.text:SetTextColor(qc.r, qc.g, qc.b)

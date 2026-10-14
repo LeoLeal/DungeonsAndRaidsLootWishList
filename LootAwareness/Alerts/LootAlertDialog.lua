@@ -25,8 +25,8 @@ local function buildAlertItemLink(record)
     return record.itemLink
   end
 
-  if record.itemID and type(GetItemInfo) == "function" then
-    local itemLink = select(2, GetItemInfo(record.itemID))
+  if record.itemID and type(C_Item) == "table" and type(C_Item.GetItemInfo) == "function" then
+    local itemLink = select(2, C_Item.GetItemInfo(record.itemID))
     if itemLink then
       return itemLink
     end
@@ -42,16 +42,16 @@ end
 
 local function getAlertItemIcon(record)
   local itemLink = buildAlertItemLink(record)
-  if type(GetItemIcon) ~= "function" then
+  if type(C_Item) ~= "table" or type(C_Item.GetItemIconByID) ~= "function" then
     return nil
   end
 
   if itemLink then
-    return GetItemIcon(itemLink)
+    return C_Item.GetItemIconByID(itemLink)
   end
 
   if record.itemID then
-    return GetItemIcon(record.itemID)
+    return C_Item.GetItemIconByID(record.itemID)
   end
 
   return nil
@@ -90,12 +90,12 @@ local function getAlertItemColor(itemLink)
   end
 
   local quality = nil
-  if type(GetItemInfo) == "function" and type(itemLink) == "string" then
-    quality = select(3, GetItemInfo(itemLink))
+  if type(C_Item) == "table" and type(C_Item.GetItemInfo) == "function" and type(itemLink) == "string" then
+    quality = select(3, C_Item.GetItemInfo(itemLink))
   end
 
-  if quality and type(GetItemQualityColor) == "function" then
-    local r, g, b = GetItemQualityColor(quality)
+  if quality and type(C_Item) == "table" and type(C_Item.GetItemQualityColor) == "function" then
+    local r, g, b = C_Item.GetItemQualityColor(quality)
     if r and g and b then
       return r, g, b
     end

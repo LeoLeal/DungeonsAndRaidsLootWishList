@@ -75,8 +75,8 @@ local function getDeleteDialogTooltipRef(runtimeNamespace, itemData)
   end
 
   local itemID = itemData and itemData.itemID or nil
-  if type(GetItemInfo) == "function" then
-    local itemLink = select(2, GetItemInfo(itemID))
+  if type(C_Item) == "table" and type(C_Item.GetItemInfo) == "function" then
+    local itemLink = select(2, C_Item.GetItemInfo(itemID))
     if type(itemLink) == "string" and itemLink ~= "" then
       return runtimeNamespace.ItemResolver.getTooltipRef({ itemID = itemID, itemLink = itemLink }) or itemLink
     end
@@ -87,8 +87,8 @@ end
 
 local function getDeleteDialogItemIcon(runtimeNamespace, itemData)
   local tooltipRef = getDeleteDialogTooltipRef(runtimeNamespace, itemData)
-  if type(GetItemIcon) == "function" then
-    return GetItemIcon(tooltipRef) or GetItemIcon(itemData and itemData.itemID or nil)
+  if type(C_Item) == "table" and type(C_Item.GetItemIconByID) == "function" then
+    return C_Item.GetItemIconByID(tooltipRef) or C_Item.GetItemIconByID(itemData and itemData.itemID or nil)
   end
 
   return nil
@@ -107,10 +107,10 @@ local function getDeleteDialogItemColor(itemLink)
     end
   end
 
-  if type(GetItemInfo) == "function" and type(itemLink) == "string" then
-    local quality = select(3, GetItemInfo(itemLink))
-    if quality and type(GetItemQualityColor) == "function" then
-      local r, g, b = GetItemQualityColor(quality)
+  if type(C_Item) == "table" and type(C_Item.GetItemInfo) == "function" and type(itemLink) == "string" then
+    local quality = select(3, C_Item.GetItemInfo(itemLink))
+    if quality and type(C_Item.GetItemQualityColor) == "function" then
+      local r, g, b = C_Item.GetItemQualityColor(quality)
       if r and g and b then
         return r, g, b
       end

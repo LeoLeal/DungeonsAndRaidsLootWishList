@@ -91,11 +91,11 @@ local function getTrackerGroupingMode()
 end
 
 local function getItemInfoName(itemRefOrItemID)
-  if type(GetItemInfo) ~= "function" then
+  if type(C_Item) ~= "table" or type(C_Item.GetItemInfo) ~= "function" then
     return nil
   end
 
-  local itemName = GetItemInfo(itemRefOrItemID)
+  local itemName = C_Item.GetItemInfo(itemRefOrItemID)
   if type(itemName) == "string" and itemName ~= "" then
     return itemName
   end
@@ -607,14 +607,14 @@ SlashCmdList["LWTESTROLL"] = function(msg)
   frame.rollID = rollID
 
   if frame.IconFrame and frame.IconFrame.Icon then
-    local itemIcon = GetItemIcon(itemID) or 134430
+    local itemIcon = C_Item.GetItemIconByID(itemID) or 134430
     frame.IconFrame.Icon:SetTexture(itemIcon)
   end
   if frame.Name then
     frame.Name:SetText(testItem.itemName or "Test Item")
 
-    local quality = forcedQuality or select(3, GetItemInfo(itemLink)) or 4
-    local r, g, b = GetItemQualityColor(quality)
+    local quality = forcedQuality or select(3, C_Item.GetItemInfo(itemLink)) or 4
+    local r, g, b = C_Item.GetItemQualityColor(quality)
     frame.Name:SetVertexColor(r, g, b)
 
     if frame.Border then
@@ -671,7 +671,7 @@ SlashCmdList["LWTESTROLL"] = function(msg)
   NUM_GROUP_LOOT_FRAMES = original_NUM_GROUP_LOOT_FRAMES
   _G["GroupLootFrame5"] = nil -- Clean up the global taint
 
-  local displayedQuality = forcedQuality or select(3, GetItemInfo(itemLink)) or 4
+  local displayedQuality = forcedQuality or select(3, C_Item.GetItemInfo(itemLink)) or 4
   print("LootWishList: Created and showed a template GroupLootFrame for " ..
     (testItem.itemName or "Test Item") .. " at rarity " .. tostring(displayedQuality) .. "!")
 end
@@ -696,8 +696,8 @@ SlashCmdList["LWTESTALERT"] = function()
   local testItem = trackedItems[randomIndex]
   local itemID = testItem.itemID
   local itemLink = namespace.Tracker.ResolveEffectiveDisplayLink(namespace, testItem)
-  if type(GetItemInfo) == "function" then
-    itemLink = select(2, GetItemInfo(itemLink)) or select(2, GetItemInfo(itemID)) or itemLink
+  if type(C_Item) == "table" and type(C_Item.GetItemInfo) == "function" then
+    itemLink = select(2, C_Item.GetItemInfo(itemLink)) or select(2, C_Item.GetItemInfo(itemID)) or itemLink
   end
 
   local alertRecord = namespace.LootAwareness.BuildAlertRecord(namespace, itemID, randomName, itemLink)

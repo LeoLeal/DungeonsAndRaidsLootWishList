@@ -11,11 +11,11 @@ local LEGACY_LOCALIZED_FIELDS = {
 }
 
 local function resolveInventoryType(itemId)
-  if itemId == nil or type(GetItemInfoInstant) ~= "function" then
+  if itemId == nil or type(C_Item) ~= "table" or type(C_Item.GetItemInfoInstant) ~= "function" then
     return nil
   end
 
-  local _, _, _, inventoryType = GetItemInfoInstant(itemId)
+  local _, _, _, inventoryType = C_Item.GetItemInfoInstant(itemId)
   if type(inventoryType) == "string" and inventoryType ~= "" then
     return inventoryType
   end

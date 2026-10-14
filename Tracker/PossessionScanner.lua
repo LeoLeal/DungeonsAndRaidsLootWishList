@@ -3,8 +3,8 @@ local _, namespace = ...
 local PossessionScanner = {}
 
 local function getItemLevel(itemLink)
-  if type(GetDetailedItemLevelInfo) == "function" and itemLink then
-    return GetDetailedItemLevelInfo(itemLink)
+  if type(C_Item) == "table" and type(C_Item.GetDetailedItemLevelInfo) == "function" and itemLink then
+    return C_Item.GetDetailedItemLevelInfo(itemLink)
   end
 
   return nil
